@@ -4,7 +4,7 @@ export type User = {
   online?: boolean;
 };
 
-export type Member = User & { online: boolean; lastReadId: number };
+export type Member = User & { online: boolean; lastReadId: number; lastDeliveredId: number };
 
 export type Message = {
   id: number;
@@ -30,5 +30,15 @@ export type ServerEvent =
   | { type: 'message'; message: Message }
   | { type: 'chat'; chat: Chat }
   | { type: 'read'; chatId: number; userId: number; messageId: number }
+  | { type: 'delivered'; chatId: number; userId: number; messageId: number }
   | { type: 'typing'; chatId: number; userId: number; username: string }
   | { type: 'presence'; userId: number; online: boolean };
+
+// A message the server has not confirmed yet.
+export type PendingMessage = {
+  tempId: string;
+  chatId: number;
+  body: string;
+  createdAt: number;
+  failed: boolean;
+};

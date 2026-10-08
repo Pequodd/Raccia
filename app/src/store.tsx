@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { api } from './api';
 import { Socket } from './socket';
-import type { Chat, Message, ServerEvent, User } from './types';
+import type { Chat, Message, PendingMessage, ServerEvent, User } from './types';
 
 type ChatMessages = { items: Message[]; hasMore: boolean; loaded: boolean };
 
@@ -9,6 +9,7 @@ type State = {
   chats: Chat[];
   messages: Record<number, ChatMessages>;
   typing: Record<number, { username: string; until: number } | undefined>;
+  pending: Record<number, PendingMessage[] | undefined>;
   connected: boolean;
 };
 
@@ -18,12 +19,16 @@ type Action =
   | { type: 'messages'; chatId: number; items: Message[]; hasMore: boolean; prepend: boolean }
   | { type: 'message'; message: Message; me: number; activeChatId: number | null }
   | { type: 'read'; chatId: number; userId: number; messageId: number; me: number }
+  | { type: 'delivered'; chatId: number; userId: number; messageId: number }
+  | { type: 'pendingAdd'; item: PendingMessage }
+  | { type: 'pendingFail'; chatId: number; tempId: string; failed: boolean }
+  | { type: 'pendingDrop'; chatId: number; tempId: string }
   | { type: 'typing'; chatId: number; username: string }
   | { type: 'clearTyping'; chatId: number }
   | { type: 'presence'; userId: number; online: boolean }
   | { type: 'connected'; connected: boolean };
 
-const initialState: State = { chats: [], messages: {}, typing: {}, connected: false };
+const initialState: State = { chats: [], messages: {}, typing: {}, pending: {}, connected: false };
 
 const lastActivity = (c: Chat) => c.lastMessage?.createdAt ?? c.createdAt;
 const sortChats = (chats: Chat[]) => [...chats].sort((a, b) => lastActivity(b) - lastActivity(a));
@@ -85,6 +90,40 @@ function reducer(state: State, action: Action): State {
         ),
       };
 
+    case 'delivered':
+      return {
+        ...state,
+        chats: state.chats.map((c) =>
+          c.id !== action.chatId
+            ? c
+            : {
+                ...c,
+                members: c.members.map((m) =>
+                  m.id === action.userId
+                    ? { ...m, lastDeliveredId: Math.max(m.lastDeliveredId, action.messageId) }
+                    : m
+                ),
+              }
+        ),
+      };
+
+    case 'pendingAdd': {
+      const list = state.pending[action.item.chatId] ?? [];
+      return { ...state, pending: { ...state.pending, [action.item.chatId]: [...list, action.item] } };
+    }
+
+    case 'pendingFail': {
+      const list = (state.pending[action.chatId] ?? []).map((p) =>
+        p.tempId === action.tempId ? { ...p, failed: action.failed } : p
+      );
+      return { ...state, pending: { ...state.pending, [action.chatId]: list } };
+    }
+
+    case 'pendingDrop': {
+      const list = (state.pending[action.chatId] ?? []).filter((p) => p.tempId !== action.tempId);
+      return { ...state, pending: { ...state.pending, [action.chatId]: list } };
+    }
+
     case 'typing':
       return {
         ...state,
@@ -117,7 +156,8 @@ type Messenger = State & {
   activeChatId: number | null;
   setActiveChat: (chatId: number | null) => void;
   loadMessages: (chatId: number, older?: boolean) => Promise<void>;
-  sendMessage: (chatId: number, body: string) => Promise<void>;
+  sendMessage: (chatId: number, body: string) => void;
+  retryMessage: (item: PendingMessage) => void;
   markRead: (chatId: number) => void;
   notifyTyping: (chatId: number) => void;
   openDirect: (userId: number) => Promise<Chat>;
@@ -177,6 +217,9 @@ export function MessengerProvider({
         case 'read':
           dispatch({ type: 'read', chatId: event.chatId, userId: event.userId, messageId: event.messageId, me: me.id });
           break;
+        case 'delivered':
+          dispatch({ type: 'delivered', chatId: event.chatId, userId: event.userId, messageId: event.messageId });
+          break;
         case 'typing':
           dispatch({ type: 'typing', chatId: event.chatId, username: event.username });
           setTimeout(() => {
@@ -219,12 +262,34 @@ export function MessengerProvider({
     });
   }, []);
 
-  const sendMessage = useCallback(async (chatId: number, body: string) => {
-    const { message } = await api.send(chatId, body);
-    dispatch({ type: 'message', message, me: me.id, activeChatId: activeRef.current });
+  const lastTypingSent = useRef(0);
+
+  // Optimistic send: the bubble shows at once, turns into «Ошибка Y2K! Повторить» on failure.
+  const deliver = useCallback(async (item: PendingMessage) => {
+    dispatch({ type: 'pendingFail', chatId: item.chatId, tempId: item.tempId, failed: false });
+    try {
+      const { message } = await api.send(item.chatId, item.body);
+      dispatch({ type: 'message', message, me: me.id, activeChatId: activeRef.current });
+      dispatch({ type: 'pendingDrop', chatId: item.chatId, tempId: item.tempId });
+    } catch {
+      dispatch({ type: 'pendingFail', chatId: item.chatId, tempId: item.tempId, failed: true });
+    }
   }, [me.id]);
 
-  const lastTypingSent = useRef(0);
+  const sendMessage = useCallback((chatId: number, body: string) => {
+    const item: PendingMessage = {
+      tempId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      chatId,
+      body,
+      createdAt: Date.now(),
+      failed: false,
+    };
+    dispatch({ type: 'pendingAdd', item });
+    deliver(item);
+    // The recipient's typing indicator clears on our message; let the next keystroke re-announce it.
+    lastTypingSent.current = 0;
+  }, [deliver]);
+
   const notifyTyping = useCallback((chatId: number) => {
     const now = Date.now();
     if (now - lastTypingSent.current < 2500) return;
@@ -252,12 +317,13 @@ export function MessengerProvider({
       setActiveChat,
       loadMessages,
       sendMessage,
+      retryMessage: deliver,
       markRead,
       notifyTyping,
       openDirect,
       createGroup,
     }),
-    [state, me, activeChatId, setActiveChat, loadMessages, sendMessage, markRead, notifyTyping, openDirect, createGroup]
+    [state, me, activeChatId, setActiveChat, loadMessages, sendMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

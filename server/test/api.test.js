@@ -82,9 +82,15 @@ test('register, login, chat and real-time delivery', async () => {
   const pushed = await bobWs.next('message');
   assert.equal(pushed.message.body, 'Привет!');
   assert.equal(pushed.message.username, 'alice');
+  const delivered = await bobWs.next('delivered');
+  assert.equal(delivered.userId, bob.data.user.id);
+  assert.equal(delivered.messageId, pushed.message.id);
 
   const bobChats = await api('/api/chats', { token: bobToken });
   assert.equal(bobChats.data.chats[0].unread, 1);
+  const bobMember = bobChats.data.chats[0].members.find((m) => m.id === bob.data.user.id);
+  assert.equal(bobMember.lastDeliveredId, pushed.message.id);
+  assert.equal(bobMember.lastReadId, 0);
   await api(`/api/chats/${chat.id}/read`, { token: bobToken, body: { messageId: pushed.message.id } });
   assert.equal((await api('/api/chats', { token: bobToken })).data.chats[0].unread, 0);
 

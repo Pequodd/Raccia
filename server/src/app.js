@@ -44,7 +44,7 @@ export function createServer(db) {
       WHERE cm.user_id = ? AND c.id = ?
     `),
     members: db.prepare(
-      'SELECT u.id, u.username, cm.last_read_id FROM chat_members cm JOIN users u ON u.id = cm.user_id WHERE cm.chat_id = ? ORDER BY u.username'
+      'SELECT u.id, u.username, cm.last_read_id, cm.last_delivered_id FROM chat_members cm JOIN users u ON u.id = cm.user_id WHERE cm.chat_id = ? ORDER BY u.username'
     ),
     isMember: db.prepare('SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?'),
     chatByDirectKey: db.prepare('SELECT id FROM chats WHERE direct_key = ?'),
@@ -61,8 +61,15 @@ export function createServer(db) {
     `),
     insertMessage: db.prepare('INSERT INTO messages (chat_id, user_id, body, created_at) VALUES (?, ?, ?, ?)'),
     markRead: db.prepare(
-      'UPDATE chat_members SET last_read_id = MAX(last_read_id, ?) WHERE chat_id = ? AND user_id = ?'
+      'UPDATE chat_members SET last_read_id = MAX(last_read_id, ?1), last_delivered_id = MAX(last_delivered_id, ?1) WHERE chat_id = ?2 AND user_id = ?3'
     ),
+    markDelivered: db.prepare(
+      'UPDATE chat_members SET last_delivered_id = ?1 WHERE chat_id = ?2 AND user_id = ?3 AND last_delivered_id < ?1'
+    ),
+    undelivered: db.prepare(`
+      SELECT cm.chat_id, (SELECT MAX(id) FROM messages m WHERE m.chat_id = cm.chat_id) AS last_id
+      FROM chat_members cm WHERE cm.user_id = ?
+    `),
   };
 
   const isOnline = (userId) => sockets.has(userId);
@@ -84,6 +91,7 @@ export function createServer(db) {
       username: m.username,
       online: isOnline(m.id),
       lastReadId: m.last_read_id,
+      lastDeliveredId: m.last_delivered_id,
     }));
     let title = row.title;
     if (row.type === 'direct') {
@@ -112,6 +120,12 @@ export function createServer(db) {
     if (!set) return;
     const data = JSON.stringify(event);
     for (const ws of set) if (ws.readyState === ws.OPEN) ws.send(data);
+  }
+
+  function markDelivered(chatId, userId, messageId) {
+    const { changes } = q.markDelivered.run(messageId, chatId, userId);
+    if (!changes) return;
+    for (const uid of memberIds(chatId)) send(uid, { type: 'delivered', chatId, userId, messageId });
   }
 
   function memberIds(chatId) {
@@ -258,7 +272,9 @@ export function createServer(db) {
     const id = Number(q.insertMessage.run(req.chatId, req.user.id, body, Date.now()).lastInsertRowid);
     q.markRead.run(id, req.chatId, req.user.id);
     const message = messageView(q.messageById.get(id));
-    for (const uid of memberIds(req.chatId)) send(uid, { type: 'message', message });
+    const members = memberIds(req.chatId);
+    for (const uid of members) send(uid, { type: 'message', message });
+    for (const uid of members) if (uid !== req.user.id && isOnline(uid)) markDelivered(req.chatId, uid, id);
     res.status(201).json({ message });
   });
 
@@ -318,6 +334,11 @@ export function createServer(db) {
     });
 
     ws.send(JSON.stringify({ type: 'ready', user }));
+
+    // Everything sent while this user was offline is delivered now.
+    for (const row of q.undelivered.all(user.id)) {
+      if (row.last_id) markDelivered(row.chat_id, user.id, row.last_id);
+    }
   });
 
   const heartbeat = setInterval(() => {

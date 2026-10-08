@@ -1,33 +1,34 @@
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api';
-import { Avatar } from '../components/Avatar';
-import { Header, HeaderButton } from '../components/Header';
+import { Chrome, ChromeButton, Icon, Lollipop, Plastic } from '../components/y2k';
 import { useMessenger } from '../store';
-import { useTheme } from '../theme';
 import type { User } from '../types';
+import { colors, fonts, plastic } from '../y2k';
+import type { NewChatMode } from './ChatListScreen';
 
-export function NewChatScreen({ onClose }: { onClose: () => void }) {
-  const theme = useTheme();
+export function NewChatScreen({ mode, onClose, wide }: { mode: NewChatMode; onClose: () => void; wide: boolean }) {
+  const insets = useSafeAreaInsets();
   const { openDirect, createGroup, setActiveChat } = useMessenger();
+  const group = mode === 'group';
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<User[]>([]);
-  const [group, setGroup] = useState(false);
   const [title, setTitle] = useState('');
   const [selected, setSelected] = useState<Map<number, User>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       api
         .searchUsers(query.trim())
         .then((r) => !cancelled && setUsers(r.users))
-        .catch((e) => !cancelled && setError(e.message));
+        .catch(() => !cancelled && setError('Нет сигнала. Ищем спутник…'));
     }, 200);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [query]);
 
@@ -44,7 +45,7 @@ export function NewChatScreen({ onClose }: { onClose: () => void }) {
       setActiveChat(chat.id);
       onClose();
     } catch (e) {
-      setError((e as Error).message);
+      setError(`Ошибка Y2K! ${(e as Error).message}`);
     }
   }
 
@@ -54,86 +55,143 @@ export function NewChatScreen({ onClose }: { onClose: () => void }) {
       setActiveChat(chat.id);
       onClose();
     } catch (e) {
-      setError((e as Error).message);
+      setError(`Ошибка Y2K! ${(e as Error).message}`);
     }
   }
 
-  const input = [styles.input, { backgroundColor: theme.surface, color: theme.text }];
   const canCreate = group && title.trim().length > 0 && selected.size > 0;
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.bg }]}>
-      <Header
-        title={group ? 'Новая группа' : 'Новый чат'}
-        left={<HeaderButton label="‹ Назад" onPress={onClose} />}
-        right={canCreate ? <HeaderButton label="Создать" onPress={submitGroup} /> : null}
-      />
+    <View style={styles.root}>
+      <Chrome style={[styles.header, { paddingTop: wide ? 0 : insets.top }]}>
+        <View style={styles.headerRow}>
+          <ChromeButton size={38} onPress={onClose} label="Назад" icon={<Icon name="back" size={18} />} />
+          <Text style={styles.title}>{group ? 'Тусовка' : 'Новый канал'}</Text>
+          <View style={{ width: 38 }} />
+        </View>
+      </Chrome>
+
       <View style={styles.controls}>
-        <Pressable
-          onPress={() => {
-            setGroup(!group);
-            setSelected(new Map());
-          }}
-          style={[styles.toggle, { borderColor: theme.accent, backgroundColor: group ? theme.accent : 'transparent' }]}
-        >
-          <Text style={{ color: group ? theme.accentText : theme.accent, fontWeight: '600' }}>
-            {group ? '✓ Групповой чат' : 'Создать группу'}
-          </Text>
-        </Pressable>
         {group ? (
           <TextInput
-            style={input}
-            placeholder="Название группы"
-            placeholderTextColor={theme.muted}
+            style={styles.input}
+            placeholder="Название тусовки"
+            placeholderTextColor={colors.placeholder}
             value={title}
             onChangeText={setTitle}
             maxLength={100}
           />
         ) : null}
-        <TextInput
-          style={input}
-          placeholder="Поиск по имени"
-          placeholderTextColor={theme.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={query}
-          onChangeText={setQuery}
-          autoFocus
-        />
-        {error ? <Text style={{ color: theme.danger }}>{error}</Text> : null}
+        <View style={styles.search}>
+          <Icon name="search" size={16} color={colors.text4} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Поиск абонента по нику…"
+            placeholderTextColor={colors.placeholder}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={query}
+            onChangeText={setQuery}
+            autoFocus
+          />
+        </View>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
+
       <FlatList
         data={users}
         keyExtractor={(u) => String(u.id)}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => pick(item)}
-            style={({ pressed }) => [styles.row, { backgroundColor: pressed ? theme.surface : theme.bg }]}
-          >
-            <Avatar name={item.username} size={40} online={item.online} />
-            <Text style={[styles.name, { color: theme.text }]}>{item.username}</Text>
-            {group ? (
-              <Text style={{ color: selected.has(item.id) ? theme.accent : theme.border, fontSize: 20 }}>
-                {selected.has(item.id) ? '●' : '○'}
-              </Text>
-            ) : null}
-          </Pressable>
-        )}
-        ListEmptyComponent={
-          <Text style={[styles.empty, { color: theme.muted }]}>Никого не найдено</Text>
-        }
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => {
+          const on = selected.has(item.id);
+          return (
+            <Pressable
+              onPress={() => pick(item)}
+              style={({ pressed }) => [styles.card, on && styles.cardOn, pressed && { transform: [{ scale: 0.98 }] }]}
+            >
+              <Lollipop name={item.username} size={42} online={item.online} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>{item.username}</Text>
+                <Text style={styles.status}>{item.online ? 'в сети' : 'вне зоны доступа'}</Text>
+              </View>
+              {group ? <View style={[styles.check, on && styles.checkOn]}>{on ? <Text style={styles.checkMark}>✓</Text> : null}</View> : null}
+            </Pressable>
+          );
+        }}
+        ListEmptyComponent={<Text style={styles.empty}>В киберпространстве никого не нашлось.</Text>}
       />
+
+      {group ? (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <Plastic
+            colors={plastic.lime}
+            style={styles.create}
+            onPress={submitGroup}
+            disabled={!canCreate}
+            accessibilityLabel="Собрать тусовку"
+          >
+            <Text style={styles.createText}>
+              Собрать тусовку{selected.size ? ` · ${selected.size + 1}` : ''}
+            </Text>
+          </Plastic>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  header: { borderBottomWidth: 1, borderBottomColor: colors.chromeEdge, boxShadow: '0 2px 6px rgba(27,21,48,0.15)', zIndex: 2 },
+  headerRow: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 10 },
+  title: { flex: 1, textAlign: 'center', fontFamily: fonts.display, fontSize: 20, color: colors.ink },
   controls: { padding: 12, gap: 10 },
-  toggle: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 7 },
-  input: { height: 44, borderRadius: 10, paddingHorizontal: 12, fontSize: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 8 },
-  name: { flex: 1, fontSize: 16 },
-  empty: { textAlign: 'center', padding: 24 },
+  input: {
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,75,200,0.3)',
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    color: colors.ink,
+    outlineWidth: 0,
+  },
+  search: {
+    height: 38,
+    borderRadius: 19,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,75,200,0.25)',
+  },
+  searchInput: { flex: 1, height: 36, fontFamily: fonts.body, fontSize: 14, color: colors.ink, outlineWidth: 0 },
+  error: { fontFamily: fonts.bodyBold, fontSize: 13, color: '#8A0070' },
+  list: { paddingHorizontal: 12, paddingBottom: 16, gap: 6 },
+  card: {
+    height: 62,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+  },
+  cardOn: { borderColor: '#7CC21E', backgroundColor: 'rgba(194,240,106,0.25)' },
+  name: { fontFamily: fonts.bodyHeavy, fontSize: 15, color: colors.ink },
+  status: { fontFamily: fonts.mono, fontSize: 11, color: colors.text4 },
+  check: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.chromeEdge, alignItems: 'center', justifyContent: 'center' },
+  checkOn: { backgroundColor: '#7CC21E', borderColor: '#7CC21E' },
+  checkMark: { color: colors.white, fontFamily: fonts.bodyHeavy, fontSize: 13 },
+  empty: { fontFamily: fonts.body, fontSize: 14, color: colors.text3, textAlign: 'center', padding: 24 },
+  footer: { paddingHorizontal: 12, paddingTop: 8 },
+  create: { height: 52, alignItems: 'center', justifyContent: 'center' },
+  createText: { fontFamily: fonts.display, fontSize: 18, color: '#1F3300' },
 });

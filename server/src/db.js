@@ -34,6 +34,7 @@ export function openDb(file) {
       chat_id      INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
       user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       last_read_id INTEGER NOT NULL DEFAULT 0,
+      last_delivered_id INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (chat_id, user_id)
     );
     CREATE INDEX IF NOT EXISTS chat_members_user ON chat_members(user_id);
@@ -47,5 +48,10 @@ export function openDb(file) {
     );
     CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat_id, id);
   `);
+  // Columns added after the first release.
+  const memberCols = db.prepare('PRAGMA table_info(chat_members)').all().map((c) => c.name);
+  if (!memberCols.includes('last_delivered_id')) {
+    db.exec('ALTER TABLE chat_members ADD COLUMN last_delivered_id INTEGER NOT NULL DEFAULT 0');
+  }
   return db;
 }
