@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,28 +14,61 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError } from '../api';
+import { parseInvite } from '../config';
 import { ChromeLogo, Plastic, stickers } from '../components/y2k';
 import { colors, diagonal, fonts, plastic } from '../y2k';
-import type { User } from '../types';
+import type { Me } from '../types';
 
 type Problem = { kind: 'auth' | 'offline' | 'other'; text: string };
 
-export function AuthScreen({ onAuth }: { onAuth: (token: string, user: User) => void }) {
+export function AuthScreen({
+  onAuth,
+  initialInvite,
+}: {
+  onAuth: (token: string, user: Me) => void;
+  initialInvite?: string | null;
+}) {
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>(initialInvite ? 'register' : 'login');
+  const [invite, setInvite] = useState(initialInvite ?? '');
+  const [inviter, setInviter] = useState<{ ok: boolean; text: string } | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [focus, setFocus] = useState<'nick' | 'pass' | null>(null);
+  const [focus, setFocus] = useState<'nick' | 'pass' | 'invite' | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Show who sent the invite as soon as a code is there.
+  useEffect(() => {
+    const code = parseInvite(invite);
+    if (mode !== 'register' || !code) {
+      setInviter(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .invite(code)
+        .then((r) => !cancelled && setInviter({ ok: true, text: `Тебя пригласил ${r.invitedBy}` }))
+        .catch((e: ApiError) =>
+          !cancelled && setInviter({ ok: false, text: e.status === 0 ? 'Нет сигнала. Ищем спутник…' : 'Инвайт недействителен или уже использован' })
+        );
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [invite, mode]);
 
   async function submit() {
     if (busy || !username || !password) return;
     setBusy(true);
     setProblem(null);
     try {
-      const fn = mode === 'login' ? api.login : api.register;
-      const { token, user } = await fn(username.trim(), password);
+      const { token, user } =
+        mode === 'login'
+          ? await api.login(username.trim(), password)
+          : await api.register(username.trim(), password, parseInvite(invite) || undefined);
       onAuth(token, user);
     } catch (e) {
       const err = e as ApiError;
@@ -47,7 +80,7 @@ export function AuthScreen({ onAuth }: { onAuth: (token: string, user: User) => 
     }
   }
 
-  const fieldStyle = (name: 'nick' | 'pass') => [
+  const fieldStyle = (name: 'nick' | 'pass' | 'invite') => [
     styles.input,
     focus === name && styles.inputFocus,
     problem?.kind === 'auth' && styles.inputError,
@@ -73,6 +106,25 @@ export function AuthScreen({ onAuth }: { onAuth: (token: string, user: User) => 
           <Text style={styles.slogan}>НеМногонациональный мессенджер Олег</Text>
 
           <View style={styles.fields}>
+            {mode === 'register' ? (
+              <View>
+                <Text style={styles.label}>ИНВАЙТ</Text>
+                <TextInput
+                  style={fieldStyle('invite')}
+                  value={invite}
+                  onChangeText={setInvite}
+                  onFocus={() => setFocus('invite')}
+                  onBlur={() => setFocus(null)}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="код или ссылка"
+                  placeholderTextColor={colors.placeholder}
+                />
+                {inviter ? (
+                  <Text style={[styles.inviter, !inviter.ok && { color: '#8A0070' }]}>{inviter.text}</Text>
+                ) : null}
+              </View>
+            ) : null}
             <View>
               <Text style={styles.label}>НИК</Text>
               <TextInput
@@ -233,5 +285,6 @@ const styles = StyleSheet.create({
   switch: { paddingVertical: 14 },
   hint: { fontFamily: fonts.body, fontSize: 14, color: colors.text2, textAlign: 'center' },
   link: { fontFamily: fonts.bodyHeavy, color: colors.bondiText },
+  inviter: { fontFamily: fonts.bodyHeavy, fontSize: 13, color: colors.grapeText, paddingLeft: 16, marginTop: 5 },
   footer: { fontFamily: fonts.mono, fontSize: 11, color: colors.text4, textAlign: 'center', marginTop: 24 },
 });

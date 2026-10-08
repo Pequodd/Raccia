@@ -13,10 +13,29 @@ import {
   initials,
 } from '../y2k';
 
-export const stickers = {
+// The Oleg sticker pack; the same ids serve as avatars (server: AVATARS).
+export const stickerImages: Record<string, number> = {
+  hello: require('../../assets/stickers/webp/hello.webp'),
+  luv: require('../../assets/stickers/webp/luv.webp'),
+  cool: require('../../assets/stickers/webp/cool.webp'),
   idea: require('../../assets/stickers/webp/idea.webp'),
-  sleep: require('../../assets/stickers/webp/sleep.webp'),
   q: require('../../assets/stickers/webp/q.webp'),
+  cry: require('../../assets/stickers/webp/cry.webp'),
+  cry2: require('../../assets/stickers/webp/cry2.webp'),
+  attack: require('../../assets/stickers/webp/attack.webp'),
+  drink: require('../../assets/stickers/webp/drink.webp'),
+  drink2: require('../../assets/stickers/webp/drink2.webp'),
+  down: require('../../assets/stickers/webp/down.webp'),
+  smoke: require('../../assets/stickers/webp/smoke.webp'),
+  sleep: require('../../assets/stickers/webp/sleep.webp'),
+  work: require('../../assets/stickers/webp/work.webp'),
+  away: require('../../assets/stickers/webp/away.webp'),
+};
+
+export const stickers = {
+  idea: stickerImages.idea,
+  sleep: stickerImages.sleep,
+  q: stickerImages.q,
 };
 
 // «Cyberspace grid» behind every screen.
@@ -181,14 +200,15 @@ export function Lollipop({
   name,
   size = 48,
   online,
-  image,
+  avatar,
 }: {
   name: string;
   size?: number;
   online?: boolean;
-  image?: number;
+  avatar?: string | null;
 }) {
   const grad = avatarGradient(name);
+  const image = avatar ? stickerImages[avatar] : undefined;
   const dot = Math.max(10, Math.round(size * 0.31));
   return (
     <View style={{ width: size, height: size }}>

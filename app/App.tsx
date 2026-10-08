@@ -6,7 +6,7 @@ import { useFonts } from 'expo-font';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError, setAuthToken } from './src/api';
 import { Chrome, ChromeButton, ChromeLogo, GridBackground, Icon, Lollipop, Plastic, stickers } from './src/components/y2k';
@@ -17,10 +17,21 @@ import { ChatScreen } from './src/screens/ChatScreen';
 import { NewChatScreen } from './src/screens/NewChatScreen';
 import { tokenStorage } from './src/storage';
 import { MessengerProvider, useMessenger } from './src/store';
-import type { User } from './src/types';
+import type { Me } from './src/types';
 import { colors, diagonal, fonts, plastic } from './src/y2k';
 
-type Session = { token: string; user: User };
+type Session = { token: string; user: Me };
+
+// Web: an invite link opens the app with ?invite=CODE.
+function inviteFromUrl(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('invite');
+}
+
+function clearInviteFromUrl() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.location.search) return;
+  window.history.replaceState(null, '', window.location.pathname);
+}
 
 // List and conversation side by side on tablets and desktop browsers.
 const WIDE_BREAKPOINT = 768;
@@ -62,7 +73,8 @@ export default function App() {
     restore();
   }, [restore]);
 
-  const onAuth = useCallback(async (token: string, user: User) => {
+  const onAuth = useCallback(async (token: string, user: Me) => {
+    clearInviteFromUrl();
     await tokenStorage.set(token);
     setAuthToken(token);
     setSession({ token, user });
@@ -90,7 +102,7 @@ export default function App() {
         ) : offline ? (
           <Offline onRetry={restore} onLogout={onLogout} />
         ) : (
-          <AuthScreen onAuth={onAuth} />
+          <AuthScreen onAuth={onAuth} initialInvite={inviteFromUrl()} />
         )}
       </View>
     </SafeAreaProvider>
@@ -125,7 +137,7 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
 function Shell({ onLogout }: { onLogout: () => void }) {
   const { width } = useWindowDimensions();
   const wide = width >= WIDE_BREAKPOINT;
-  const { me, connected, activeChatId, setActiveChat } = useMessenger();
+  const { me, activeChatId, setActiveChat } = useMessenger();
   const [tab, setTab] = useState<Tab>('chats');
   const [composing, setComposing] = useState<NewChatMode | null>(null);
   const [query, setQuery] = useState('');
@@ -143,7 +155,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
   if (wide) {
     let main;
-    if (tab === 'profile') main = <ProfileScreen me={me} connected={connected} wide />;
+    if (tab === 'profile') main = <ProfileScreen wide />;
     else if (tab === 'settings') main = <SettingsScreen onLogout={onLogout} wide />;
     else if (activeChatId) main = <ChatScreen chatId={activeChatId} wide />;
     else
@@ -168,9 +180,9 @@ function Shell({ onLogout }: { onLogout: () => void }) {
                 <SearchField value={query} onChange={setQuery} />
               </View>
               <View style={styles.toolbarLinks}>
-                <Lollipop name={me.username} size={30} />
+                <Lollipop name={me.name} size={30} avatar={me.avatar} />
                 <Text style={styles.toolbarLink} onPress={() => setTab('profile')}>
-                  Абонент {me.username}
+                  Абонент {me.name}
                 </Text>
                 <Text style={styles.toolbarDot}>·</Text>
                 <Text style={styles.toolbarLink} onPress={() => setTab('settings')}>
@@ -197,7 +209,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   }
 
   let body;
-  if (tab === 'profile') body = <ProfileScreen me={me} connected={connected} wide={false} />;
+  if (tab === 'profile') body = <ProfileScreen wide={false} />;
   else if (tab === 'settings') body = <SettingsScreen onLogout={onLogout} wide={false} />;
   else body = list;
 

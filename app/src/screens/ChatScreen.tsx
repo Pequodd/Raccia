@@ -23,7 +23,8 @@ type Row =
   | { kind: 'message'; key: string; message: Message; showAuthor: boolean; tail: boolean }
   | { kind: 'pending'; key: string; item: PendingMessage }
   | { kind: 'day'; key: string; label: string }
-  | { kind: 'typing'; key: string; username: string };
+  | { kind: 'typing'; key: string; name: string }
+  | { kind: 'service'; key: string; message: Message };
 
 const STATUS_LABEL = { 1: 'Отправлено', 2: 'Получено', 3: 'Записано на дискету' } as const;
 
@@ -53,13 +54,13 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const readUpTo = Math.max(0, ...others.map((m) => m.lastReadId));
   const deliveredUpTo = Math.max(0, ...others.map((m) => m.lastDeliveredId ?? 0));
   const ticksFor = (id: number): 1 | 2 | 3 => (readUpTo >= id ? 3 : deliveredUpTo >= id ? 2 : 1);
-  const lastMine = [...(bucket?.items ?? [])].reverse().find((m) => m.userId === me.id)?.id;
+  const lastMine = [...(bucket?.items ?? [])].reverse().find((m) => m.userId === me.id && m.kind === 'text')?.id;
   const t = typing[chatId];
 
   // Newest first: the list is inverted so the feed sticks to the bottom.
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
-    if (t) out.push({ kind: 'typing', key: 'typing', username: t.username });
+    if (t) out.push({ kind: 'typing', key: 'typing', name: t.name });
     for (const item of [...(queued ?? [])].reverse()) out.push({ kind: 'pending', key: item.tempId, item });
     const items = bucket?.items ?? [];
     for (let i = items.length - 1; i >= 0; i--) {
@@ -67,12 +68,17 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       const prev = items[i - 1];
       const next = items[i + 1];
       const newDay = !prev || new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
+      if (m.kind === 'service') {
+        out.push({ kind: 'service', key: String(m.id), message: m });
+        if (newDay) out.push({ kind: 'day', key: `day-${m.id}`, label: dayLabel(m.createdAt) });
+        continue;
+      }
       out.push({
         kind: 'message',
         key: String(m.id),
         message: m,
-        showAuthor: chat?.type === 'group' && m.userId !== me.id && (newDay || prev?.userId !== m.userId),
-        tail: !next || next.userId !== m.userId,
+        showAuthor: chat?.type === 'group' && m.userId !== me.id && (newDay || prev?.userId !== m.userId || prev?.kind !== 'text'),
+        tail: !next || next.userId !== m.userId || next.kind !== 'text',
       });
       if (newDay) out.push({ kind: 'day', key: `day-${m.id}`, label: dayLabel(m.createdAt) });
     }
@@ -89,7 +95,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
   const other = chat.type === 'direct' ? others[0] : undefined;
   let subtitle: string;
-  if (t) subtitle = chat.type === 'group' ? `${t.username} передаёт сигнал…` : 'передаёт сигнал…';
+  if (t) subtitle = chat.type === 'group' ? `${t.name} передаёт сигнал…` : 'передаёт сигнал…';
   else if (chat.type === 'group') {
     const n = chat.members.length;
     const online = chat.members.filter((m) => m.online).length;
@@ -132,10 +138,18 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
             </Chrome>
           </View>
         );
+      case 'service':
+        return (
+          <View style={styles.serviceRow}>
+            <View style={styles.service}>
+              <Text style={styles.serviceText}>{item.message.body}</Text>
+            </View>
+          </View>
+        );
       case 'typing':
         return (
           <Bubble mine={false} tail>
-            {chat!.type === 'group' ? <Text style={[styles.author, { color: authorColor(item.username) }]}>{item.username}</Text> : null}
+            {chat!.type === 'group' ? <Text style={[styles.author, { color: authorColor(item.name) }]}>{item.name}</Text> : null}
             <View style={styles.dots}>
               {[1, 0.7, 0.4].map((o) => (
                 <View key={o} style={[styles.dot, { opacity: o }]} />
@@ -179,7 +193,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
         }
         return (
           <Bubble mine={false} tail={item.tail}>
-            {item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.username) }]}>{m.username}</Text> : null}
+            {item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name) }]}>{m.name}</Text> : null}
             <Text style={styles.textTheirs}>{m.body}</Text>
             <Text style={styles.metaTheirs}>{clockTime(m.createdAt)}</Text>
           </Bubble>
@@ -193,7 +207,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       <Chrome style={[styles.header, { paddingTop: wide ? 0 : insets.top }]}>
         <View style={[styles.headerRow, wide && styles.headerRowWide]}>
           {wide ? (
-            <Lollipop name={chat.title} size={38} online={other?.online} />
+            <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />
           ) : (
             <ChromeButton size={38} onPress={onBack ?? (() => {})} label="Назад" icon={<Icon name="back" size={18} />} />
           )}
@@ -205,7 +219,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
               {subtitle}
             </Text>
           </View>
-          {wide ? null : <Lollipop name={chat.title} size={38} online={other?.online} />}
+          {wide ? null : <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />}
         </View>
       </Chrome>
 
@@ -316,6 +330,15 @@ const styles = StyleSheet.create({
   feedContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 7, flexGrow: 1 },
   feedWide: { width: '100%', maxWidth: 720, alignSelf: 'center' },
   dayRow: { alignItems: 'center', marginVertical: 4 },
+  serviceRow: { alignItems: 'center', marginVertical: 2 },
+  service: {
+    maxWidth: '86%',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(123,75,200,0.14)',
+  },
+  serviceText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.serviceText, textAlign: 'center' },
   dayPill: {
     borderRadius: 12,
     overflow: 'hidden',

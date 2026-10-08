@@ -1,14 +1,16 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { Socket } from './socket';
-import type { Chat, Message, PendingMessage, ServerEvent, User } from './types';
+import type { Chat, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
 
 type ChatMessages = { items: Message[]; hasMore: boolean; loaded: boolean };
 
 type State = {
   chats: Chat[];
   messages: Record<number, ChatMessages>;
-  typing: Record<number, { username: string; until: number } | undefined>;
+  typing: Record<number, { name: string; until: number } | undefined>;
+  votes: Record<number, Vote>; // by candidate id, while the vote runs
+  results: VoteResult[]; // finished votes not yet dismissed
   pending: Record<number, PendingMessage[] | undefined>;
   connected: boolean;
 };
@@ -23,12 +25,17 @@ type Action =
   | { type: 'pendingAdd'; item: PendingMessage }
   | { type: 'pendingFail'; chatId: number; tempId: string; failed: boolean }
   | { type: 'pendingDrop'; chatId: number; tempId: string }
-  | { type: 'typing'; chatId: number; username: string }
+  | { type: 'typing'; chatId: number; name: string }
+  | { type: 'votes'; votes: Vote[] }
+  | { type: 'vote'; vote: Vote }
+  | { type: 'voteClosed'; candidateId: number }
+  | { type: 'voteResult'; result: VoteResult }
+  | { type: 'dismissResult'; candidateId: number }
   | { type: 'clearTyping'; chatId: number }
   | { type: 'presence'; userId: number; online: boolean }
   | { type: 'connected'; connected: boolean };
 
-const initialState: State = { chats: [], messages: {}, typing: {}, pending: {}, connected: false };
+const initialState: State = { chats: [], messages: {}, typing: {}, pending: {}, votes: {}, results: [], connected: false };
 
 const lastActivity = (c: Chat) => c.lastMessage?.createdAt ?? c.createdAt;
 const sortChats = (chats: Chat[]) => [...chats].sort((a, b) => lastActivity(b) - lastActivity(a));
@@ -127,8 +134,28 @@ function reducer(state: State, action: Action): State {
     case 'typing':
       return {
         ...state,
-        typing: { ...state.typing, [action.chatId]: { username: action.username, until: Date.now() + 4000 } },
+        typing: { ...state.typing, [action.chatId]: { name: action.name, until: Date.now() + 4000 } },
       };
+
+    case 'votes':
+      return { ...state, votes: Object.fromEntries(action.votes.map((v) => [v.candidate.id, v])) };
+
+    case 'vote':
+      return { ...state, votes: { ...state.votes, [action.vote.candidate.id]: action.vote } };
+
+    case 'voteClosed': {
+      const { [action.candidateId]: _closed, ...votes } = state.votes;
+      return { ...state, votes };
+    }
+
+    case 'voteResult': {
+      const { [action.result.candidateId]: _done, ...votes } = state.votes;
+      const results = [action.result, ...state.results.filter((r) => r.candidateId !== action.result.candidateId)];
+      return { ...state, votes, results };
+    }
+
+    case 'dismissResult':
+      return { ...state, results: state.results.filter((r) => r.candidateId !== action.candidateId) };
 
     case 'clearTyping':
       return { ...state, typing: { ...state.typing, [action.chatId]: undefined } };
@@ -152,7 +179,10 @@ function mergeSorted(a: Message[], b: Message[]) {
 }
 
 type Messenger = State & {
-  me: User;
+  me: Me;
+  setMe: (me: Me) => void;
+  castVote: (candidateId: number, vote: 'for' | 'against' | null) => Promise<void>;
+  dismissResult: (candidateId: number) => void;
   activeChatId: number | null;
   setActiveChat: (chatId: number | null) => void;
   loadMessages: (chatId: number, older?: boolean) => Promise<void>;
@@ -167,19 +197,20 @@ type Messenger = State & {
 const MessengerContext = createContext<Messenger | null>(null);
 
 export function MessengerProvider({
-  me,
+  me: initialMe,
   token,
   activeChatId,
   setActiveChat,
   children,
 }: {
-  me: User;
+  me: Me;
   token: string;
   activeChatId: number | null;
   setActiveChat: (chatId: number | null) => void;
   children: ReactNode;
 }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [me, setMe] = useState(initialMe);
   const socketRef = useRef<Socket | null>(null);
   const activeRef = useRef(activeChatId);
   activeRef.current = activeChatId;
@@ -189,6 +220,11 @@ export function MessengerProvider({
   const refreshChats = useCallback(async () => {
     const { chats } = await api.chats();
     dispatch({ type: 'chats', chats });
+  }, []);
+
+  const refreshVotes = useCallback(async () => {
+    const { votes } = await api.votes();
+    dispatch({ type: 'votes', votes });
   }, []);
 
   const markRead = useCallback((chatId: number) => {
@@ -205,6 +241,26 @@ export function MessengerProvider({
   useEffect(() => {
     const onEvent = (event: ServerEvent) => {
       switch (event.type) {
+        case 'ready':
+        case 'me':
+          setMe(event.user);
+          break;
+        case 'user':
+          // Someone changed name or avatar: titles and member lists follow.
+          refreshChats().catch(() => {});
+          break;
+        case 'vote':
+          dispatch({ type: 'vote', vote: event.vote });
+          break;
+        case 'vote_closed':
+          dispatch({ type: 'voteClosed', candidateId: event.candidateId });
+          break;
+        case 'vote_result': {
+          const { type: _t, ...result } = event;
+          dispatch({ type: 'voteResult', result });
+          refreshChats().catch(() => {});
+          break;
+        }
         case 'message':
           dispatch({ type: 'message', message: event.message, me: me.id, activeChatId: activeRef.current });
           if (event.message.chatId === activeRef.current && event.message.userId !== me.id) {
@@ -221,7 +277,7 @@ export function MessengerProvider({
           dispatch({ type: 'delivered', chatId: event.chatId, userId: event.userId, messageId: event.messageId });
           break;
         case 'typing':
-          dispatch({ type: 'typing', chatId: event.chatId, username: event.username });
+          dispatch({ type: 'typing', chatId: event.chatId, name: event.name });
           setTimeout(() => {
             const t = stateRef.current.typing[event.chatId];
             if (t && t.until <= Date.now()) dispatch({ type: 'clearTyping', chatId: event.chatId });
@@ -237,6 +293,7 @@ export function MessengerProvider({
       // After a reconnect, catch up on anything missed while offline.
       if (connected) {
         refreshChats().catch(() => {});
+        refreshVotes().catch(() => {});
         const active = activeRef.current;
         if (active) api.messages(active).then((r) =>
           dispatch({ type: 'messages', chatId: active, items: r.messages, hasMore: r.hasMore, prepend: false })
@@ -246,7 +303,14 @@ export function MessengerProvider({
     const socket = new Socket(token, onEvent, onStatus);
     socketRef.current = socket;
     return () => socket.close();
-  }, [token, me.id, refreshChats, markRead]);
+  }, [token, me.id, refreshChats, refreshVotes, markRead]);
+
+  const castVote = useCallback(async (candidateId: number, vote: 'for' | 'against' | null) => {
+    const res = await api.vote(candidateId, vote);
+    if (res.vote) dispatch({ type: 'vote', vote: res.vote });
+  }, []);
+
+  const dismissResult = useCallback((candidateId: number) => dispatch({ type: 'dismissResult', candidateId }), []);
 
   const loadMessages = useCallback(async (chatId: number, older = false) => {
     const bucket = stateRef.current.messages[chatId];
@@ -313,6 +377,9 @@ export function MessengerProvider({
     () => ({
       ...state,
       me,
+      setMe,
+      castVote,
+      dismissResult,
       activeChatId,
       setActiveChat,
       loadMessages,
@@ -323,7 +390,7 @@ export function MessengerProvider({
       openDirect,
       createGroup,
     }),
-    [state, me, activeChatId, setActiveChat, loadMessages, sendMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
+    [state, me, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

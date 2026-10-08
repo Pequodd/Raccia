@@ -110,10 +110,12 @@ export function NewChatScreen({ mode, onClose, wide }: { mode: NewChatMode; onCl
               onPress={() => pick(item)}
               style={({ pressed }) => [styles.card, on && styles.cardOn, pressed && { transform: [{ scale: 0.98 }] }]}
             >
-              <Lollipop name={item.username} size={42} online={item.online} />
+              <Lollipop name={item.name} size={42} online={item.online} avatar={item.avatar} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.username}</Text>
-                <Text style={styles.status}>{item.online ? 'в сети' : 'вне зоны доступа'}</Text>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.status}>
+                  @{item.username} · {item.online ? 'в сети' : 'вне зоны доступа'}
+                </Text>
               </View>
               {group ? <View style={[styles.check, on && styles.checkOn]}>{on ? <Text style={styles.checkMark}>✓</Text> : null}</View> : null}
             </Pressable>

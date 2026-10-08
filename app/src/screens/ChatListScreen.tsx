@@ -1,7 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CandidateCard, InviteCard, ResultCard, VoteCard } from '../components/initiation';
 import { Chrome, Icon, Lollipop, Plastic } from '../components/y2k';
+import { useState } from 'react';
 import { useMessenger } from '../store';
 import type { Chat } from '../types';
 import { colors, diagonal, fonts, formatTime, plastic } from '../y2k';
@@ -45,8 +47,10 @@ export function ChatListScreen({
   onNewChat: (mode: NewChatMode) => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { chats, me, connected, activeChatId, setActiveChat, typing } = useMessenger();
+  const { chats, me, connected, activeChatId, setActiveChat, typing, votes, results } = useMessenger();
   const visible = filterChats(chats, query);
+  const [inviting, setInviting] = useState(false);
+  const otherVotes = Object.values(votes).filter((v) => v.candidate.id !== me.id);
 
   function renderItem({ item }: { item: Chat }) {
     const other = item.type === 'direct' ? item.members.find((m) => m.id !== me.id) : undefined;
@@ -54,8 +58,9 @@ export function ChatListScreen({
     const t = typing[item.id];
     const last = item.lastMessage;
     let preview = 'Эфир пуст';
-    if (t) preview = item.type === 'group' ? `${t.username} передаёт сигнал…` : 'передаёт сигнал…';
-    else if (last) preview = (last.userId === me.id ? 'Я: ' : item.type === 'group' ? `${last.username}: ` : '') + last.body;
+    if (t) preview = item.type === 'group' ? `${t.name} передаёт сигнал…` : 'передаёт сигнал…';
+    else if (last?.kind === 'service') preview = last.body;
+    else if (last) preview = (last.userId === me.id ? 'Я: ' : item.type === 'group' ? `${last.name}: ` : '') + last.body;
     const ink = selected ? colors.white : colors.ink;
 
     return (
@@ -69,7 +74,7 @@ export function ChatListScreen({
             <LinearGradient colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']} style={styles.cardShine} />
           </View>
         ) : null}
-        <Lollipop name={item.title} online={other?.online} />
+        <Lollipop name={item.title} online={other?.online} avatar={other?.avatar} />
         <View style={styles.cardBody}>
           <View style={styles.line}>
             <Text numberOfLines={1} style={[styles.name, { color: ink }]}>
@@ -102,7 +107,7 @@ export function ChatListScreen({
       {wide ? null : (
         <Chrome style={[styles.header, { paddingTop: insets.top }]}>
           <View style={styles.headerRow}>
-            <Lollipop name={me.username} size={38} />
+            <Lollipop name={me.name} size={38} avatar={me.avatar} />
             <View style={styles.headerTitle}>
               <Text style={styles.title}>Сообщения</Text>
               {connected ? null : <Text style={styles.connecting}>Ищем спутник…</Text>}
@@ -133,10 +138,21 @@ export function ChatListScreen({
               <Plastic colors={plastic.bondi} style={styles.chip} onPress={() => onNewChat('direct')} accessibilityLabel="Новый канал">
                 <Text style={styles.chipText}>+ Новый канал</Text>
               </Plastic>
+              <Plastic colors={plastic.grape} style={styles.chip} onPress={() => setInviting(true)} accessibilityLabel="Выдать инвайт">
+                <Text style={styles.chipText}>Выдать инвайт</Text>
+              </Plastic>
               <Plastic colors={plastic.lime} style={styles.chip} onPress={() => onNewChat('group')} accessibilityLabel="Тусовка">
                 <Text style={[styles.chipText, { color: '#1F3300' }]}>Тусовка</Text>
               </Plastic>
             </View>
+            {inviting ? <InviteCard onClose={() => setInviting(false)} /> : null}
+            {results.map((r) => (
+              <ResultCard key={r.candidateId} result={r} />
+            ))}
+            {me.status === 'candidate' ? <CandidateCard vote={votes[me.id]} /> : null}
+            {otherVotes.map((v) => (
+              <VoteCard key={v.candidate.id} vote={v} />
+            ))}
             {wide && !connected ? <Text style={[styles.connecting, { textAlign: 'left' }]}>Нет сигнала. Ищем спутник…</Text> : null}
           </View>
         }

@@ -1,5 +1,5 @@
 import { API_URL } from './config';
-import type { Chat, Message, User } from './types';
+import type { Chat, Me, Message, User, Vote } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -32,13 +32,20 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
-type Session = { token: string; user: User };
+type Session = { token: string; user: Me };
 
 export const api = {
-  register: (username: string, password: string) => request<Session>('/api/register', { username, password }),
+  register: (username: string, password: string, invite?: string) =>
+    request<Session>('/api/register', { username, password, invite }),
+  invite: (code: string) => request<{ invitedBy: string }>(`/api/invites/${encodeURIComponent(code)}`),
+  createInvite: () => request<{ code: string }>('/api/invites', {}),
+  votes: () => request<{ votes: Vote[] }>('/api/votes'),
+  vote: (candidateId: number, vote: 'for' | 'against' | null) =>
+    request<{ vote: Vote | null }>(`/api/votes/${candidateId}`, { vote }),
+  updateProfile: (profile: { name?: string; avatar?: string | null }) => request<{ user: Me }>('/api/me', profile),
   login: (username: string, password: string) => request<Session>('/api/login', { username, password }),
   logout: () => request<{ ok: true }>('/api/logout', {}),
-  me: () => request<{ user: User }>('/api/me'),
+  me: () => request<{ user: Me }>('/api/me'),
   searchUsers: (q: string) => request<{ users: User[] }>(`/api/users?q=${encodeURIComponent(q)}`),
   chats: () => request<{ chats: Chat[] }>('/api/chats'),
   openDirect: (userId: number) => request<{ chat: Chat }>('/api/chats/direct', { userId }),
