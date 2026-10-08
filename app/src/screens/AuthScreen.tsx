@@ -43,7 +43,7 @@ export function AuthScreen({ onAuth }: { onAuth: (token: string, user: User) => 
       style={[styles.root, { backgroundColor: theme.bg }]}
     >
       <View style={styles.card}>
-        <Text style={[styles.logo, { color: theme.accent }]}>Raccia</Text>
+        <Text style={[styles.logo, { color: theme.accent }]}>Олег</Text>
         <Text style={[styles.caption, { color: theme.muted }]}>
           {mode === 'login' ? 'Войдите, чтобы продолжить' : 'Создайте аккаунт'}
         </Text>

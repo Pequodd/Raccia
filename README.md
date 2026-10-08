@@ -1,4 +1,4 @@
-# Raccia
+# Олег
 
 Мессенджер для **iOS, Android и Web** с одной кодовой базой клиента.
 
@@ -38,7 +38,7 @@ npm run android    # эмулятор Android / Expo Go на телефоне
 Адрес сервера клиент определяет сам: в браузере это `localhost:3000`, на телефоне с Expo Go — IP компьютера, где запущен Metro, в эмуляторе Android — `10.0.2.2:3000`.
 Чтобы указать адрес явно, задайте `EXPO_PUBLIC_API_URL`, например `EXPO_PUBLIC_API_URL=https://api.example.com npm run web`.
 
-Переменные сервера: `PORT` (по умолчанию `3000`) и `DB_FILE` (по умолчанию `server/data/raccia.db`).
+Переменные сервера: `PORT` (по умолчанию `3000`) и `DB_FILE` (по умолчанию `server/data/oleg.db`).
 
 ## Проверки
 

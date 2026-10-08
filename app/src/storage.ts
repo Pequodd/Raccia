@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const TOKEN_KEY = 'raccia.token';
+const TOKEN_KEY = 'oleg.token';
 
 export const tokenStorage = {
   get: () => AsyncStorage.getItem(TOKEN_KEY),
