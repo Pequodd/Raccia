@@ -10,6 +10,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, useWindowDime
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError, setAuthToken } from './src/api';
 import { Chrome, ChromeButton, ChromeLogo, GridBackground, Icon, Lollipop, Plastic, stickers } from './src/components/y2k';
+import { makeStyles, SkinProvider, useSkin } from './src/skins';
 import { ProfileScreen, SettingsScreen } from './src/screens/AccountScreens';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatListScreen, SearchField, type NewChatMode } from './src/screens/ChatListScreen';
@@ -18,7 +19,7 @@ import { NewChatScreen } from './src/screens/NewChatScreen';
 import { tokenStorage } from './src/storage';
 import { MessengerProvider, useMessenger } from './src/store';
 import type { Me } from './src/types';
-import { colors, diagonal, fonts, plastic } from './src/y2k';
+import { diagonal } from './src/y2k';
 
 type Session = { token: string; user: Me };
 
@@ -37,6 +38,17 @@ function clearInviteFromUrl() {
 const WIDE_BREAKPOINT = 768;
 
 export default function App() {
+  return (
+    <SkinProvider>
+      <Root />
+    </SkinProvider>
+  );
+}
+
+function Root() {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const [fontsLoaded] = useFonts({
     Exo2_800ExtraBold_Italic,
     Nunito_400Regular,
@@ -92,10 +104,10 @@ export default function App() {
     <SafeAreaProvider>
       <View style={styles.root}>
         <GridBackground />
-        <StatusBar style="dark" />
+        <StatusBar style={skin.dark ? 'light' : 'dark'} />
         {booting || !fontsLoaded ? (
           <View style={styles.center}>
-            <ActivityIndicator color={colors.bondiText} />
+            <ActivityIndicator color={colors.accentText} />
           </View>
         ) : session ? (
           <Messenger key={session.token} session={session} onLogout={onLogout} />
@@ -110,15 +122,18 @@ export default function App() {
 }
 
 function Offline({ onRetry, onLogout }: { onRetry: () => void; onLogout: () => void }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <View style={[styles.center, { gap: 14, padding: 24 }]}>
       <Image source={stickers.sleep} style={{ width: 200, height: 200 }} contentFit="contain" />
-      <Text style={styles.offlineTitle}>Нет сигнала</Text>
+      <Text style={styles.offlineTitle}>{skin.copy.noSignal.split('.')[0]}</Text>
       <Text style={styles.offlineText}>Ищем спутник… Сервер Олега не отвечает.</Text>
       <Plastic colors={plastic.bondi} style={styles.offlineButton} onPress={onRetry} accessibilityLabel="Повторить">
         <Text style={styles.offlineButtonText}>Повторить</Text>
       </Plastic>
-      <ChromeButton label="Выход" onPress={onLogout} />
+      <ChromeButton label={skin.copy.logout} onPress={onLogout} />
     </View>
   );
 }
@@ -126,6 +141,9 @@ function Offline({ onRetry, onLogout }: { onRetry: () => void; onLogout: () => v
 type Tab = 'chats' | 'profile' | 'settings';
 
 function Messenger({ session, onLogout }: { session: Session; onLogout: () => void }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const [activeChatId, setActiveChat] = useState<number | null>(null);
   return (
     <MessengerProvider me={session.user} token={session.token} activeChatId={activeChatId} setActiveChat={setActiveChat}>
@@ -135,6 +153,9 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
 }
 
 function Shell({ onLogout }: { onLogout: () => void }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE_BREAKPOINT;
   const { me, activeChatId, setActiveChat } = useMessenger();
@@ -222,11 +243,14 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 }
 
 function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const items: { key: Tab; label: string; icon: 'chat' | 'person' | 'settings' }[] = [
-    { key: 'chats', label: 'Сообщения', icon: 'chat' },
-    { key: 'profile', label: 'Абонент', icon: 'person' },
-    { key: 'settings', label: 'Настройки', icon: 'settings' },
+    { key: 'chats', label: skin.copy.chats, icon: 'chat' },
+    { key: 'profile', label: skin.copy.profile, icon: 'person' },
+    { key: 'settings', label: skin.copy.settings, icon: 'settings' },
   ];
   return (
     <Chrome style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -243,7 +267,7 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
                 <Icon name={it.icon} size={20} color={colors.text2} />
               </View>
             )}
-            <Text style={[styles.tabLabel, on && { color: colors.bondiText }]}>{it.label}</Text>
+            <Text style={[styles.tabLabel, on && { color: colors.accentText }]}>{it.label}</Text>
           </Pressable>
         );
       })}
@@ -251,8 +275,8 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#E6E8F2' },
+const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+  root: { flex: 1, backgroundColor: colors.screen },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   offlineTitle: { fontFamily: fonts.display, fontSize: 30, color: colors.ink },
   offlineText: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center' },
@@ -277,7 +301,7 @@ const styles = StyleSheet.create({
   toolbarLink: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: colors.ink },
   toolbarDot: { color: colors.text4 },
   split: { flex: 1, flexDirection: 'row' },
-  sidebar: { width: 370, backgroundColor: 'rgba(255,255,255,0.45)', borderRightWidth: 1, borderRightColor: 'rgba(140,150,160,0.5)' },
+  sidebar: { width: 370, backgroundColor: colors.sidebar, borderRightWidth: 1, borderRightColor: colors.divider },
   main: { flex: 1 },
   tabBar: {
     flexDirection: 'row',
@@ -288,4 +312,4 @@ const styles = StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', gap: 3 },
   tabCapsule: { width: 38, height: 30, alignItems: 'center', justifyContent: 'center' },
   tabLabel: { fontFamily: fonts.bodyHeavy, fontSize: 11, color: colors.text2 },
-});
+}));

@@ -6,7 +6,8 @@ import { api } from '../api';
 import { inviteLink } from '../config';
 import { useMessenger } from '../store';
 import type { Vote, VoteResult } from '../types';
-import { clockTime, colors, diagonal, fonts, plastic } from '../y2k';
+import { clockTime, diagonal } from '../y2k';
+import { makeStyles, useSkin } from '../skins';
 import { ChromeButton, Lcd, Lollipop, Plastic } from './y2k';
 
 // Re-renders every second while mounted: drives the LCD countdowns.
@@ -25,6 +26,9 @@ function countdown(endsAt: number, now: number) {
 }
 
 function GrapeCard({ children }: { children: React.ReactNode }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <View style={styles.card}>
       <View style={[StyleSheet.absoluteFill, styles.cardClip]} pointerEvents="none">
@@ -37,6 +41,9 @@ function GrapeCard({ children }: { children: React.ReactNode }) {
 }
 
 function Tally({ vote }: { vote: Vote }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const total = vote.yes + vote.no + vote.thinking || 1;
   return (
     <>
@@ -54,6 +61,9 @@ function Tally({ vote }: { vote: Vote }) {
 
 // «НОВЫЙ АБОНЕНТ!» — shown to everyone while a newcomer's vote runs.
 export function VoteCard({ vote }: { vote: Vote }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const now = useNow();
   const { castVote } = useMessenger();
   const [busy, setBusy] = useState(false);
@@ -65,7 +75,7 @@ export function VoteCard({ vote }: { vote: Vote }) {
     try {
       await castVote(vote.candidate.id, v);
     } catch (e) {
-      setError(`Ошибка Y2K! ${(e as Error).message}`);
+      setError(`${skin.copy.errorPrefix} ${(e as Error).message}`);
     } finally {
       setBusy(false);
     }
@@ -74,7 +84,7 @@ export function VoteCard({ vote }: { vote: Vote }) {
   return (
     <GrapeCard>
       <View style={styles.titleRow}>
-        <Text style={styles.title}>НОВЫЙ АБОНЕНТ!</Text>
+        <Text style={styles.title}>{skin.copy.voteTitle}</Text>
         <Lcd>{countdown(vote.endsAt, now)}</Lcd>
       </View>
       <View style={styles.candidate}>
@@ -98,9 +108,9 @@ export function VoteCard({ vote }: { vote: Vote }) {
       ) : (
         <View style={styles.buttons}>
           <Plastic colors={plastic.lime} style={styles.button} onPress={() => cast('for')} disabled={busy} accessibilityLabel="Впустить">
-            <Text style={[styles.buttonText, { color: '#1F3300' }]}>Впустить</Text>
+            <Text style={[styles.buttonText, { color: colors.limeText }]}>{skin.copy.voteFor}</Text>
           </Plastic>
-          <ChromeButton label="Отключить" onPress={() => cast('against')} disabled={busy} style={styles.button} />
+          <ChromeButton label={skin.copy.voteAgainst} onPress={() => cast('against')} disabled={busy} style={styles.button} />
         </View>
       )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -110,6 +120,9 @@ export function VoteCard({ vote }: { vote: Vote }) {
 
 // What the newcomer sees while the others decide.
 export function CandidateCard({ vote }: { vote: Vote | undefined }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const now = useNow();
   const { me } = useMessenger();
   return (
@@ -131,6 +144,9 @@ export function CandidateCard({ vote }: { vote: Vote | undefined }) {
 }
 
 export function ResultCard({ result }: { result: VoteResult }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const { me, dismissResult } = useMessenger();
   const mine = result.candidateId === me.id;
   let text: string;
@@ -154,6 +170,9 @@ export function ResultCard({ result }: { result: VoteResult }) {
 
 // «Выдать инвайт»: a one-time link to share.
 export function InviteCard({ onClose }: { onClose: () => void }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -162,7 +181,7 @@ export function InviteCard({ onClose }: { onClose: () => void }) {
     api
       .createInvite()
       .then(({ code }) => setLink(inviteLink(code)))
-      .catch((e) => setError(`Ошибка Y2K! ${(e as Error).message}`));
+      .catch((e) => setError(`${skin.copy.errorPrefix} ${(e as Error).message}`));
   }, []);
 
   async function copy() {
@@ -207,7 +226,7 @@ export function InviteCard({ onClose }: { onClose: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   card: {
     borderRadius: 20,
     paddingHorizontal: 14,
@@ -227,7 +246,7 @@ const styles = StyleSheet.create({
   candidateMeta: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   bar: { height: 8, borderRadius: 4, flexDirection: 'row', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.25)' },
   barYes: { backgroundColor: colors.neon, boxShadow: `0 0 6px ${colors.neonGlow}` },
-  barNo: { backgroundColor: '#FF5ADF' },
+  barNo: { backgroundColor: colors.voteNo },
   tally: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.9)' },
   note: { fontFamily: fonts.bodyBold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   buttons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -247,12 +266,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 12,
     gap: 3,
-    backgroundColor: 'rgba(155,255,58,0.22)',
+    backgroundColor: colors.okBg,
     borderWidth: 1,
-    borderColor: 'rgba(124,194,30,0.6)',
+    borderColor: colors.okBorder,
   },
-  resultNo: { backgroundColor: 'rgba(255,43,214,0.1)', borderColor: 'rgba(212,0,174,0.3)' },
+  resultNo: { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder },
   resultTitle: { fontFamily: fonts.mono, fontSize: 12, color: colors.ink },
   resultText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
   resultHint: { fontFamily: fonts.mono, fontSize: 10, color: colors.text4 },
-});
+}));

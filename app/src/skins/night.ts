@@ -1,0 +1,58 @@
+import type { Skin } from './types';
+import { y2k } from './y2k';
+
+// «Ночная смена»: the same Y2K plastic on a dark CRT background.
+export const night: Skin = {
+  ...y2k,
+  id: 'night',
+  name: 'Ночная смена',
+  dark: true,
+  colors: {
+    ...y2k.colors,
+    ink: '#ECE8FF',
+    text2: '#C4BEDF',
+    text3: '#A9A2C8',
+    text4: '#8C86A8',
+    placeholder: '#7D7699',
+    accentText: '#3FD8F5',
+    focus: '#3FD8F5',
+    labelText: '#B99BFF',
+    serviceText: '#D8CCFF',
+    serviceBg: 'rgba(165,123,232,0.22)',
+    dangerText: '#FF9BEA',
+    dangerBg: 'rgba(255,43,214,0.16)',
+    dangerBorder: 'rgba(255,106,230,0.45)',
+    okBg: 'rgba(155,255,58,0.14)',
+    okBorder: 'rgba(155,255,58,0.45)',
+    limeAccent: '#9BFF3A',
+    chromeEdge: '#4A4566',
+    readTick: '#3FD8F5',
+    screen: '#0E0A1C',
+    surface: 'rgba(255,255,255,0.07)',
+    surfaceBorder: 'rgba(255,255,255,0.12)',
+    field: 'rgba(255,255,255,0.08)',
+    fieldFocus: 'rgba(255,255,255,0.12)',
+    fieldBorder: 'rgba(185,155,255,0.35)',
+    fieldBorderSoft: 'rgba(185,155,255,0.22)',
+    sidebar: 'rgba(0,0,0,0.25)',
+    divider: 'rgba(185,155,255,0.2)',
+  },
+  chrome: {
+    colors: ['#4A4566', '#2E2A44', '#1B1530', '#2A2640', '#3A3556'],
+    locations: [0, 0.4, 0.52, 0.75, 1],
+  },
+  logoChrome: [
+    { offset: 0, color: '#FFFFFF' },
+    { offset: 0.45, color: '#B8F0FF' },
+    { offset: 0.5, color: '#3FD8F5' },
+    { offset: 0.62, color: '#9BE7FF' },
+    { offset: 1, color: '#FFFFFF' },
+  ],
+  logoShadow: '#000000',
+  background: { gradient: ['#1E1838', '#0B0816'], grid: 'rgba(63,216,245,0.08)' },
+  copy: {
+    ...y2k.copy,
+    loginButton: 'Выйти в ночной эфир',
+    footer: 'ЭНЕРГОСБЕРЕЖЕНИЕ МОНИТОРА: ВКЛ ✓',
+  },
+};

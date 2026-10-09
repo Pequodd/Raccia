@@ -3,14 +3,18 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CandidateCard, InviteCard, ResultCard, VoteCard } from '../components/initiation';
 import { Chrome, Icon, Lollipop, Plastic } from '../components/y2k';
+import { makeStyles, useSkin } from '../skins';
 import { useState } from 'react';
 import { useMessenger } from '../store';
 import type { Chat } from '../types';
-import { colors, diagonal, fonts, formatTime, plastic } from '../y2k';
+import { diagonal, formatTime } from '../y2k';
 
 export type NewChatMode = 'direct' | 'group';
 
 export function SearchField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <View style={styles.search}>
       <Icon name="search" size={16} color={colors.text4} />
@@ -18,7 +22,7 @@ export function SearchField({ value, onChange }: { value: string; onChange: (v: 
         style={styles.searchInput}
         value={value}
         onChangeText={onChange}
-        placeholder="Поиск в киберпространстве…"
+        placeholder={skin.copy.search}
         placeholderTextColor={colors.placeholder}
         autoCapitalize="none"
         autoCorrect={false}
@@ -46,6 +50,9 @@ export function ChatListScreen({
   onQuery: (q: string) => void;
   onNewChat: (mode: NewChatMode) => void;
 }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { chats, me, connected, activeChatId, setActiveChat, typing, votes, results } = useMessenger();
   const visible = filterChats(chats, query);
@@ -58,7 +65,7 @@ export function ChatListScreen({
     const t = typing[item.id];
     const last = item.lastMessage;
     let preview = 'Эфир пуст';
-    if (t) preview = item.type === 'group' ? `${t.name} передаёт сигнал…` : 'передаёт сигнал…';
+    if (t) preview = item.type === 'group' ? `${t.name} ${skin.copy.typing}` : skin.copy.typing;
     else if (last?.kind === 'service') preview = last.body;
     else if (last) preview = (last.userId === me.id ? 'Я: ' : item.type === 'group' ? `${last.name}: ` : '') + last.body;
     const ink = selected ? colors.white : colors.ink;
@@ -87,7 +94,7 @@ export function ChatListScreen({
           <View style={styles.line}>
             <Text
               numberOfLines={1}
-              style={[styles.preview, t && { color: colors.bondiText, fontFamily: fonts.bodyBold }, selected && { color: 'rgba(255,255,255,0.9)' }]}
+              style={[styles.preview, t && { color: colors.accentText, fontFamily: fonts.bodyBold }, selected && { color: 'rgba(255,255,255,0.9)' }]}
             >
               {preview}
             </Text>
@@ -109,7 +116,7 @@ export function ChatListScreen({
           <View style={styles.headerRow}>
             <Lollipop name={me.name} size={38} avatar={me.avatar} />
             <View style={styles.headerTitle}>
-              <Text style={styles.title}>Сообщения</Text>
+              <Text style={styles.title}>{skin.copy.chats}</Text>
               {connected ? null : <Text style={styles.connecting}>Ищем спутник…</Text>}
             </View>
             <Plastic
@@ -136,13 +143,13 @@ export function ChatListScreen({
             {wide ? null : <SearchField value={query} onChange={onQuery} />}
             <View style={styles.chips}>
               <Plastic colors={plastic.bondi} style={styles.chip} onPress={() => onNewChat('direct')} accessibilityLabel="Новый канал">
-                <Text style={styles.chipText}>+ Новый канал</Text>
+                <Text style={styles.chipText}>{skin.copy.newChat}</Text>
               </Plastic>
               <Plastic colors={plastic.grape} style={styles.chip} onPress={() => setInviting(true)} accessibilityLabel="Выдать инвайт">
-                <Text style={styles.chipText}>Выдать инвайт</Text>
+                <Text style={styles.chipText}>{skin.copy.invite}</Text>
               </Plastic>
               <Plastic colors={plastic.lime} style={styles.chip} onPress={() => onNewChat('group')} accessibilityLabel="Тусовка">
-                <Text style={[styles.chipText, { color: '#1F3300' }]}>Тусовка</Text>
+                <Text style={[styles.chipText, { color: colors.limeText }]}>{skin.copy.newGroup}</Text>
               </Plastic>
             </View>
             {inviting ? <InviteCard onClose={() => setInviting(false)} /> : null}
@@ -153,7 +160,7 @@ export function ChatListScreen({
             {otherVotes.map((v) => (
               <VoteCard key={v.candidate.id} vote={v} />
             ))}
-            {wide && !connected ? <Text style={[styles.connecting, { textAlign: 'left' }]}>Нет сигнала. Ищем спутник…</Text> : null}
+            {wide && !connected ? <Text style={[styles.connecting, { textAlign: 'left' }]}>{skin.copy.noSignal}</Text> : null}
           </View>
         }
         ListEmptyComponent={
@@ -166,7 +173,7 @@ export function ChatListScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   root: { flex: 1 },
   header: {
     borderBottomWidth: 1,
@@ -180,7 +187,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontSize: 26,
     color: colors.ink,
-    textShadowColor: '#FFFFFF',
+    textShadowColor: colors.screen,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,
   },
@@ -195,9 +202,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(255,255,255,0.75)',
+    backgroundColor: colors.field,
     borderWidth: 1,
-    borderColor: 'rgba(123,75,200,0.25)',
+    borderColor: colors.fieldBorderSoft,
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.1)',
   },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 14, color: colors.ink, outlineWidth: 0, height: 36 },
@@ -211,9 +218,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 10,
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
+    borderColor: colors.surfaceBorder,
     boxShadow: '0 2px 6px rgba(27,21,48,0.08)',
   },
   cardSelected: { borderColor: 'rgba(255,255,255,0.6)', boxShadow: '0 3px 10px rgba(0,112,138,0.35)' },
@@ -226,4 +233,4 @@ const styles = StyleSheet.create({
   badge: { minWidth: 22, height: 22, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontFamily: fonts.bodyHeavy, fontSize: 12, color: colors.white },
   empty: { fontFamily: fonts.body, fontSize: 14, color: colors.text3, textAlign: 'center', padding: 28 },
-});
+}));

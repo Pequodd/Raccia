@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../components/y2k';
+import { makeStyles, useSkin } from '../skins';
 import { useMessenger } from '../store';
 import type { Message, PendingMessage } from '../types';
-import { authorColor, clockTime, colors, dayLabel, diagonal, fonts, plastic, plural } from '../y2k';
+import { authorColor, clockTime, dayLabel, diagonal, plural } from '../y2k';
 
 type Row =
   | { kind: 'message'; key: string; message: Message; showAuthor: boolean; tail: boolean }
@@ -26,9 +27,11 @@ type Row =
   | { kind: 'typing'; key: string; name: string }
   | { kind: 'service'; key: string; message: Message };
 
-const STATUS_LABEL = { 1: 'Отправлено', 2: 'Получено', 3: 'Записано на дискету' } as const;
 
 export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: () => void; wide: boolean }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { chats, messages, pending, me, typing, loadMessages, sendMessage, retryMessage, markRead, notifyTyping } =
     useMessenger();
@@ -42,7 +45,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   useEffect(() => {
     setText('');
     setError(null);
-    loadMessages(chatId).catch(() => setError('Нет сигнала. Ищем спутник…'));
+    loadMessages(chatId).catch(() => setError(skin.copy.noSignal));
   }, [chatId, loadMessages]);
 
   const lastId = bucket?.items[bucket.items.length - 1]?.id;
@@ -88,19 +91,19 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   if (!chat) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.bondiText} />
+        <ActivityIndicator color={colors.accentText} />
       </View>
     );
   }
 
   const other = chat.type === 'direct' ? others[0] : undefined;
   let subtitle: string;
-  if (t) subtitle = chat.type === 'group' ? `${t.name} передаёт сигнал…` : 'передаёт сигнал…';
+  if (t) subtitle = chat.type === 'group' ? `${t.name} ${skin.copy.typing}` : skin.copy.typing;
   else if (chat.type === 'group') {
     const n = chat.members.length;
     const online = chat.members.filter((m) => m.online).length;
     subtitle = `${n} ${plural(n, 'абонент', 'абонента', 'абонентов')} · ${online} в сети`;
-  } else subtitle = other?.online ? 'в сети' : 'вне зоны доступа';
+  } else subtitle = other?.online ? skin.copy.online : skin.copy.offline;
 
   function submit() {
     const body = text.trim();
@@ -149,7 +152,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       case 'typing':
         return (
           <Bubble mine={false} tail>
-            {chat!.type === 'group' ? <Text style={[styles.author, { color: authorColor(item.name) }]}>{item.name}</Text> : null}
+            {chat!.type === 'group' ? <Text style={[styles.author, { color: authorColor(item.name, skin) }]}>{item.name}</Text> : null}
             <View style={styles.dots}>
               {[1, 0.7, 0.4].map((o) => (
                 <View key={o} style={[styles.dot, { opacity: o }]} />
@@ -166,7 +169,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
                 <View style={styles.failMark}>
                   <Text style={styles.failMarkText}>!</Text>
                 </View>
-                <Text style={styles.failText}>Ошибка Y2K! Повторить</Text>
+                <Text style={styles.failText}>{skin.copy.errorPrefix} Повторить</Text>
               </Pressable>
             ) : (
               <Text style={styles.metaMine}>Передаём… · {clockTime(item.item.createdAt)}</Text>
@@ -183,7 +186,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
               <Text style={styles.textMine}>{m.body}</Text>
               <View style={styles.metaRow}>
                 <Text style={styles.metaMine}>
-                  {m.id === lastMine ? `${STATUS_LABEL[ticks]} · ` : ''}
+                  {m.id === lastMine ? `${skin.copy.ticks[ticks - 1]} · ` : ''}
                   {clockTime(m.createdAt)}
                 </Text>
                 <Ticks count={ticks} color={colors.mineMeta} />
@@ -193,7 +196,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
         }
         return (
           <Bubble mine={false} tail={item.tail}>
-            {item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name) }]}>{m.name}</Text> : null}
+            {item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name, skin) }]}>{m.name}</Text> : null}
             <Text style={styles.textTheirs}>{m.body}</Text>
             <Text style={styles.metaTheirs}>{clockTime(m.createdAt)}</Text>
           </Bubble>
@@ -232,12 +235,12 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
         contentContainerStyle={[styles.feedContent, wide && styles.feedWide]}
         onEndReached={loadOlder}
         onEndReachedThreshold={0.3}
-        ListFooterComponent={loadingOlder ? <ActivityIndicator style={{ margin: 12 }} color={colors.bondiText} /> : null}
+        ListFooterComponent={loadingOlder ? <ActivityIndicator style={{ margin: 12 }} color={colors.accentText} /> : null}
         ListEmptyComponent={
           bucket?.loaded ? (
-            <Text style={styles.empty}>Эфир пуст. Передай первый сигнал!</Text>
+            <Text style={styles.empty}>{skin.copy.emptyFeed}</Text>
           ) : (
-            <ActivityIndicator style={{ margin: 24 }} color={colors.bondiText} />
+            <ActivityIndicator style={{ margin: 24 }} color={colors.accentText} />
           )
         }
       />
@@ -248,7 +251,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
         <View style={[styles.composerRow, wide && styles.feedWide]}>
           <TextInput
             style={styles.input}
-            placeholder="Сигнал в эфир…"
+            placeholder={skin.copy.composer}
             placeholderTextColor={colors.placeholder}
             value={text}
             onChangeText={(v) => {
@@ -266,10 +269,10 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
             style={styles.send}
             onPress={submit}
             disabled={!text.trim()}
-            accessibilityLabel="Передать"
+            accessibilityLabel={skin.copy.send}
             shadow="0 3px 8px rgba(0,112,138,0.35)"
           >
-            <Text style={styles.sendText}>Передать</Text>
+            <Text style={styles.sendText}>{skin.copy.send}</Text>
           </Plastic>
         </View>
       </Chrome>
@@ -288,6 +291,9 @@ function Bubble({
   failed?: boolean;
   children: React.ReactNode;
 }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const corners = mine
     ? { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: tail ? 6 : 20 }
     : { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomRightRadius: 20, borderBottomLeftRadius: tail ? 6 : 20 };
@@ -312,7 +318,7 @@ function Bubble({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
@@ -325,7 +331,7 @@ const styles = StyleSheet.create({
   headerRowWide: { height: 62, paddingHorizontal: 20 },
   headerTitles: { flex: 1, alignItems: 'center' },
   headerTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
-  headerSubtitle: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.bondiText },
+  headerSubtitle: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.accentText },
   feed: { flex: 1 },
   feedContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 7, flexGrow: 1 },
   feedWide: { width: '100%', maxWidth: 720, alignSelf: 'center' },
@@ -336,7 +342,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: 'rgba(123,75,200,0.14)',
+    backgroundColor: colors.serviceBg,
   },
   serviceText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.serviceText, textAlign: 'center' },
   dayPill: {
@@ -358,7 +364,7 @@ const styles = StyleSheet.create({
   },
   bubbleMineShadow: { boxShadow: '0 3px 8px rgba(255,122,0,0.25)' },
   bubbleTheirsShadow: { boxShadow: '0 3px 8px rgba(0,106,132,0.25)' },
-  bubbleFailed: { opacity: 0.7, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.pink, boxShadow: 'none' },
+  bubbleFailed: { opacity: 0.7, borderWidth: 1.5, borderStyle: 'dashed', borderColor: plastic.pink[1], boxShadow: 'none' },
   author: { fontFamily: fonts.bodyHeavy, fontSize: 12, marginBottom: 1 },
   textTheirs: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.white },
   textMine: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.mineText },
@@ -366,13 +372,13 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 1 },
   metaMine: { fontFamily: fonts.mono, fontSize: 10, color: colors.mineMeta, alignSelf: 'flex-end' },
   failRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3, alignSelf: 'flex-end' },
-  failMark: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#D4002E', alignItems: 'center', justifyContent: 'center' },
+  failMark: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
   failMarkText: { color: colors.white, fontFamily: fonts.bodyHeavy, fontSize: 11 },
-  failText: { fontFamily: fonts.bodyHeavy, fontSize: 12, color: '#8A0070' },
+  failText: { fontFamily: fonts.bodyHeavy, fontSize: 12, color: colors.dangerText },
   dots: { flexDirection: 'row', gap: 5, paddingVertical: 6, paddingHorizontal: 2 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.neon, boxShadow: `0 0 6px ${colors.neonGlow}` },
   empty: { fontFamily: fonts.body, fontSize: 14, color: colors.text3, textAlign: 'center', padding: 24, transform: [{ scaleY: -1 }] },
-  error: { fontFamily: fonts.bodyBold, fontSize: 13, color: '#8A0070', textAlign: 'center', paddingVertical: 4 },
+  error: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.dangerText, textAlign: 'center', paddingVertical: 4 },
   composer: { borderTopWidth: 1, borderTopColor: colors.chromeEdge, paddingTop: 8, paddingHorizontal: 10 },
   composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   input: {
@@ -382,9 +388,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: colors.field,
     borderWidth: 1,
-    borderColor: 'rgba(123,75,200,0.25)',
+    borderColor: colors.fieldBorderSoft,
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.1)',
     fontFamily: fonts.body,
     fontSize: 15,
@@ -393,4 +399,4 @@ const styles = StyleSheet.create({
   },
   send: { height: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   sendText: { fontFamily: fonts.display, fontSize: 15, color: colors.white },
-});
+}));

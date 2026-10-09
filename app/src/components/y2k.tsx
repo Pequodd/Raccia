@@ -3,15 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, Line, LinearGradient as SvgGradient, Path, Pattern, Rect, Stop, Text as SvgText } from 'react-native-svg';
-import {
-  avatarGradient,
-  avatarTextColor,
-  chromeStops,
-  colors,
-  diagonal,
-  fonts,
-  initials,
-} from '../y2k';
+import { avatarGradient, avatarTextColor, diagonal, initials } from '../y2k';
+import { makeStyles, useSkin } from '../skins';
 
 // The Oleg sticker pack; the same ids serve as avatars (server: AVATARS).
 export const stickerImages: Record<string, number> = {
@@ -40,14 +33,17 @@ export const stickers = {
 
 // «Cyberspace grid» behind every screen.
 export function GridBackground() {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={['#F3F4FA', '#D9DCEA']} start={{ x: 0.37, y: 0 }} end={{ x: 0.63, y: 1 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={skin.background.gradient} start={{ x: 0.37, y: 0 }} end={{ x: 0.63, y: 1 }} style={StyleSheet.absoluteFill} />
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>
           <Pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-            <Line x1="0" y1="0.5" x2="24" y2="0.5" stroke="rgba(123,75,200,0.07)" strokeWidth="1" />
-            <Line x1="0.5" y1="0" x2="0.5" y2="24" stroke="rgba(123,75,200,0.07)" strokeWidth="1" />
+            <Line x1="0" y1="0.5" x2="24" y2="0.5" stroke={skin.background.grid} strokeWidth="1" />
+            <Line x1="0.5" y1="0" x2="0.5" y2="24" stroke={skin.background.grid} strokeWidth="1" />
           </Pattern>
         </Defs>
         <Rect width="100%" height="100%" fill="url(#grid)" />
@@ -76,6 +72,9 @@ export function Plastic({
   disabled?: boolean;
   accessibilityLabel?: string;
 }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const body = (pressed: boolean) => (
     <>
       <View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]} pointerEvents="none">
@@ -123,9 +122,12 @@ export function Plastic({
 
 // Brushed chrome: header bars, tab bar, secondary buttons.
 export function Chrome({ style, children }: { style?: StyleProp<ViewStyle>; children?: ReactNode }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <View style={style}>
-      <LinearGradient colors={chromeStops.colors} locations={chromeStops.locations} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={chrome.colors} locations={chrome.locations} style={StyleSheet.absoluteFill} />
       {children}
     </View>
   );
@@ -146,6 +148,9 @@ export function ChromeButton({
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
 }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -160,7 +165,7 @@ export function ChromeButton({
         style,
       ]}
     >
-      <LinearGradient colors={chromeStops.colors} locations={chromeStops.locations} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={chrome.colors} locations={chrome.locations} style={StyleSheet.absoluteFill} />
       {icon ?? <Text style={styles.chromeButtonText}>{label}</Text>}
     </Pressable>
   );
@@ -168,6 +173,9 @@ export function ChromeButton({
 
 // «ОЛЕГ» in chrome letters with a hard drop shadow.
 export function ChromeLogo({ size = 58, text = 'ОЛЕГ' }: { size?: number; text?: string }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const width = Math.round(size * text.length * 0.78);
   const height = Math.round(size * 1.25);
   const baseline = Math.round(size * 0.95);
@@ -175,17 +183,15 @@ export function ChromeLogo({ size = 58, text = 'ОЛЕГ' }: { size?: number; te
     <Svg width={width} height={height} accessibilityLabel={text}>
       <Defs>
         <SvgGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#FFFFFF" />
-          <Stop offset="0.4" stopColor="#C9D0D7" />
-          <Stop offset="0.5" stopColor="#5E6870" />
-          <Stop offset="0.62" stopColor="#AEB7BF" />
-          <Stop offset="1" stopColor="#F2F4F6" />
+          {skin.logoChrome.map((stop) => (
+            <Stop key={stop.offset} offset={stop.offset} stopColor={stop.color} />
+          ))}
         </SvgGradient>
       </Defs>
       <SvgText x={width / 2} y={baseline + 4} textAnchor="middle" fontFamily={fonts.display} fontSize={size} fill="rgba(27,21,48,0.25)">
         {text}
       </SvgText>
-      <SvgText x={width / 2} y={baseline + 2} textAnchor="middle" fontFamily={fonts.display} fontSize={size} fill="#4A4560">
+      <SvgText x={width / 2} y={baseline + 2} textAnchor="middle" fontFamily={fonts.display} fontSize={size} fill={skin.logoShadow}>
         {text}
       </SvgText>
       <SvgText x={width / 2} y={baseline} textAnchor="middle" fontFamily={fonts.display} fontSize={size} fill="url(#chrome)">
@@ -207,18 +213,21 @@ export function Lollipop({
   online?: boolean;
   avatar?: string | null;
 }) {
-  const grad = avatarGradient(name);
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
+  const grad = avatarGradient(name, skin);
   const image = avatar ? stickerImages[avatar] : undefined;
   const dot = Math.max(10, Math.round(size * 0.31));
   return (
     <View style={{ width: size, height: size }}>
       <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', boxShadow: '0 2px 5px rgba(27,21,48,0.25)' }}>
-        <LinearGradient colors={image ? ['#FFE7C2', '#FFB866'] : grad} {...diagonal} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={image ? plastic.stickerAvatar : grad} {...diagonal} style={StyleSheet.absoluteFill} />
         {image ? (
           <Image source={image} style={{ width: size, height: size, transform: [{ translateY: size * 0.08 }, { scale: 1.15 }] }} contentFit="contain" />
         ) : (
           <View style={styles.center}>
-            <Text style={{ color: avatarTextColor(grad), fontFamily: fonts.bodyHeavy, fontSize: size * 0.36 }}>{initials(name)}</Text>
+            <Text style={{ color: avatarTextColor(grad, skin), fontFamily: fonts.bodyHeavy, fontSize: size * 0.36 }}>{initials(name)}</Text>
           </View>
         )}
         <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} style={[styles.highlight, { height: '45%' }]} pointerEvents="none" />
@@ -249,6 +258,9 @@ export function Lollipop({
 
 // Green LCD read-out: timers, pager screens.
 export function Lcd({ children, size = 16 }: { children: ReactNode; size?: number }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <View style={styles.lcd}>
       <Text style={{ fontFamily: fonts.mono, fontSize: size, color: colors.lcdText, fontWeight: '700' }}>{children}</Text>
@@ -258,11 +270,14 @@ export function Lcd({ children, size = 16 }: { children: ReactNode; size?: numbe
 
 // Delivery ticks: 1 sent · 2 delivered («Получено») · 3 read («Записано на дискету»).
 export function Ticks({ count, color }: { count: 1 | 2 | 3; color: string }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   return (
     <View style={{ flexDirection: 'row', marginLeft: 3 }}>
       {Array.from({ length: count }, (_, i) => (
         <Svg key={i} width={12} height={10} viewBox="0 0 12 10" style={{ marginLeft: i ? -6 : 0 }}>
-          <Path d="M1 5.5 4.2 8.5 11 1.5" stroke={i === 2 ? '#006A84' : color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M1 5.5 4.2 8.5 11 1.5" stroke={i === 2 ? colors.readTick : color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       ))}
     </View>
@@ -280,18 +295,21 @@ const ICON_PATHS: Record<IconName, string> = {
   back: 'M14.5 5 8 12l6.5 7',
 };
 
-export function Icon({ name, size = 22, color = colors.ink }: { name: IconName; size?: number; color?: string }) {
+export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color?: string }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   // The wrapper keeps the icon above absolutely positioned plastic layers on the web.
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size} viewBox="0 0 24 24">
-        <Path d={ICON_PATHS[name]} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <Path d={ICON_PATHS[name]} stroke={color ?? colors.ink} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </Svg>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   highlight: { position: 'absolute', left: 0, right: 0, top: 0, height: '42%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   chromeButton: {
@@ -310,4 +328,4 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     boxShadow: 'inset 0 1px 3px rgba(30,42,16,0.45)',
   },
-});
+}));

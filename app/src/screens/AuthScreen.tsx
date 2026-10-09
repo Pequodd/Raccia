@@ -16,7 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError } from '../api';
 import { parseInvite } from '../config';
 import { ChromeLogo, Plastic, stickers } from '../components/y2k';
-import { colors, diagonal, fonts, plastic, promise, promiseProof } from '../y2k';
+import { makeStyles, useSkin } from '../skins';
+import { diagonal } from '../y2k';
 import type { Me } from '../types';
 
 type Problem = { kind: 'auth' | 'offline' | 'other'; text: string };
@@ -28,6 +29,9 @@ export function AuthScreen({
   onAuth: (token: string, user: Me) => void;
   initialInvite?: string | null;
 }) {
+  const skin = useSkin();
+  const { colors, plastic, fonts, chrome } = skin;
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<'login' | 'register'>(initialInvite ? 'register' : 'login');
   const [invite, setInvite] = useState(initialInvite ?? '');
@@ -51,7 +55,7 @@ export function AuthScreen({
         .invite(code)
         .then((r) => !cancelled && setInviter({ ok: true, text: `Тебя пригласил ${r.invitedBy}` }))
         .catch((e: ApiError) =>
-          !cancelled && setInviter({ ok: false, text: e.status === 0 ? 'Нет сигнала. Ищем спутник…' : 'Инвайт недействителен или уже использован' })
+          !cancelled && setInviter({ ok: false, text: e.status === 0 ? skin.copy.noSignal : 'Инвайт недействителен или уже использован' })
         );
     }, 250);
     return () => {
@@ -72,10 +76,10 @@ export function AuthScreen({
       onAuth(token, user);
     } catch (e) {
       const err = e as ApiError;
-      if (err.status === 0) setProblem({ kind: 'offline', text: 'Нет сигнала. Ищем спутник…' });
+      if (err.status === 0) setProblem({ kind: 'offline', text: skin.copy.noSignal });
       else if (err.status === 401)
-        setProblem({ kind: 'auth', text: 'Ошибка Y2K! Компьютер думает, что сейчас 1900 год. Проверьте ник и пароль.' });
-      else setProblem({ kind: 'other', text: `Ошибка Y2K! ${err.message}` });
+        setProblem({ kind: 'auth', text: skin.copy.loginError });
+      else setProblem({ kind: 'other', text: `${skin.copy.errorPrefix} ${err.message}` });
       setBusy(false);
     }
   }
@@ -94,7 +98,7 @@ export function AuthScreen({
       >
         <View style={styles.column}>
           <View style={styles.ball}>
-            <LinearGradient colors={['rgba(0,190,225,0.75)', 'rgba(0,112,138,0.92)']} {...diagonal} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={plastic.ball} {...diagonal} style={StyleSheet.absoluteFill} />
             <Image source={stickers.idea} style={styles.ballOleg} contentFit="contain" />
             <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} style={styles.ballShine} pointerEvents="none" />
             <View style={styles.ballShade} pointerEvents="none" />
@@ -103,10 +107,10 @@ export function AuthScreen({
           <View style={styles.logo}>
             <ChromeLogo size={58} />
           </View>
-          <Text style={styles.slogan}>НеМногонациональный мессенджер Олег</Text>
+          <Text style={styles.slogan}>{skin.copy.slogan}</Text>
           <Plastic colors={plastic.lime} radius={18} style={styles.promo} shadow="0 6px 16px rgba(124,194,30,0.45)">
-            <Text style={styles.promoTitle}>{promise}</Text>
-            <Text style={styles.promoProof}>{promiseProof}</Text>
+            <Text style={styles.promoTitle}>{skin.copy.promise}</Text>
+            <Text style={styles.promoProof}>{skin.copy.promiseProof}</Text>
           </Plastic>
 
           <View style={styles.fields}>
@@ -125,7 +129,7 @@ export function AuthScreen({
                   placeholderTextColor={colors.placeholder}
                 />
                 {inviter ? (
-                  <Text style={[styles.inviter, !inviter.ok && { color: '#8A0070' }]}>{inviter.text}</Text>
+                  <Text style={[styles.inviter, !inviter.ok && { color: colors.dangerText }]}>{inviter.text}</Text>
                 ) : null}
               </View>
             ) : null}
@@ -173,12 +177,12 @@ export function AuthScreen({
             shadow="0 6px 14px rgba(255,122,0,0.35)"
             onPress={submit}
             disabled={busy || !username || !password}
-            accessibilityLabel={mode === 'login' ? 'Погнали в 2000!' : 'Подключиться'}
+            accessibilityLabel={mode === 'login' ? skin.copy.loginButton : skin.copy.registerButton}
           >
             {busy ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.buttonText}>{mode === 'login' ? 'Погнали в 2000!' : 'Подключиться'}</Text>
+              <Text style={styles.buttonText}>{mode === 'login' ? skin.copy.loginButton : skin.copy.registerButton}</Text>
             )}
           </Plastic>
 
@@ -203,14 +207,14 @@ export function AuthScreen({
             </Text>
           </Pressable>
 
-          <Text style={styles.footer}>СОВМЕСТИМО С ПРОБЛЕМОЙ 2000 ✓</Text>
+          <Text style={styles.footer}>{skin.copy.footer}</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   root: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 26, justifyContent: 'center' },
   column: { width: '100%', maxWidth: 360, alignSelf: 'center', alignItems: 'stretch' },
@@ -242,7 +246,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontSize: 11,
     letterSpacing: 1.5,
-    color: colors.grapeText,
+    color: colors.labelText,
     paddingLeft: 16,
     marginBottom: 5,
   },
@@ -250,9 +254,9 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(255,255,255,0.75)',
+    backgroundColor: colors.field,
     borderWidth: 1,
-    borderColor: 'rgba(123,75,200,0.35)',
+    borderColor: colors.fieldBorder,
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.12)',
     fontFamily: fonts.bodyBold,
     fontSize: 17,
@@ -260,23 +264,23 @@ const styles = StyleSheet.create({
     outlineWidth: 0,
   },
   inputFocus: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: colors.fieldFocus,
     borderWidth: 2,
     borderColor: colors.focus,
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.12), 0 0 0 4px rgba(0,170,205,0.2)',
   },
-  inputError: { borderColor: colors.pink },
+  inputError: { borderColor: plastic.pink[1] },
   problem: {
     marginTop: 16,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: 'rgba(255,43,214,0.1)',
+    backgroundColor: colors.dangerBg,
     borderWidth: 1,
-    borderColor: 'rgba(212,0,174,0.3)',
+    borderColor: colors.dangerBorder,
   },
-  problemOffline: { backgroundColor: 'rgba(255,255,255,0.6)', borderColor: colors.chromeEdge },
-  problemText: { fontFamily: fonts.bodyBold, fontSize: 14, color: '#8A0070', textAlign: 'center' },
+  problemOffline: { backgroundColor: colors.surface, borderColor: colors.chromeEdge },
+  problemText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.dangerText, textAlign: 'center' },
   button: { height: 56, marginTop: 20, alignItems: 'center', justifyContent: 'center' },
   buttonText: {
     fontFamily: fonts.display,
@@ -288,8 +292,8 @@ const styles = StyleSheet.create({
   },
   switch: { paddingVertical: 14 },
   hint: { fontFamily: fonts.body, fontSize: 14, color: colors.text2, textAlign: 'center' },
-  link: { fontFamily: fonts.bodyHeavy, color: colors.bondiText },
-  inviter: { fontFamily: fonts.bodyHeavy, fontSize: 13, color: colors.grapeText, paddingLeft: 16, marginTop: 5 },
+  link: { fontFamily: fonts.bodyHeavy, color: colors.accentText },
+  inviter: { fontFamily: fonts.bodyHeavy, fontSize: 13, color: colors.labelText, paddingLeft: 16, marginTop: 5 },
   footer: { fontFamily: fonts.mono, fontSize: 11, color: colors.text4, textAlign: 'center', marginTop: 24 },
   promo: {
     marginTop: 14,
@@ -299,6 +303,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     transform: [{ rotate: '-2.5deg' }],
   },
-  promoTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 25, color: '#1F3300', textAlign: 'center' },
-  promoProof: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: '#1F3300', textAlign: 'center', marginTop: 4 },
-});
+  promoTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 25, color: colors.limeText, textAlign: 'center' },
+  promoProof: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: colors.limeText, textAlign: 'center', marginTop: 4 },
+}));
