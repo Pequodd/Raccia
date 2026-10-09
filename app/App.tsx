@@ -30,6 +30,8 @@ import { diagonal } from './src/y2k';
 
 type Session = { token: string; user: Me };
 
+const rover = require('./assets/rover.webp');
+
 // Web: an invite link opens the app with ?invite=CODE.
 function inviteFromUrl(): string | null {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
@@ -220,8 +222,20 @@ function ShellBody({ onLogout, openTick }: { onLogout: () => void; openTick: num
     else
       main = (
         <View style={styles.center}>
-          <Image source={stickers.q} style={{ width: 180, height: 180 }} contentFit="contain" />
-          <Text style={styles.offlineText}>Выбери канал слева, чтобы выйти в эфир.</Text>
+          {skin.id === 'xp' ? (
+            // The XP search dog with a yellow tooltip balloon: readable over the photo.
+            <>
+              <View style={styles.xpBalloon}>
+                <Text style={styles.xpBalloonText}>Выберите беседу слева — и можно писать.</Text>
+              </View>
+              <Image source={rover} style={{ width: 150, height: 187 }} contentFit="contain" accessibilityLabel="Пёс-помощник" />
+            </>
+          ) : (
+            <>
+              <Image source={stickers.q} style={{ width: 180, height: 180 }} contentFit="contain" />
+              <Text style={styles.offlineText}>Выбери канал слева, чтобы выйти в эфир.</Text>
+            </>
+          )}
         </View>
       );
     return (
@@ -332,6 +346,18 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   root: { flex: 1, backgroundColor: colors.screen },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   offlineTitle: { fontFamily: fonts.display, fontSize: 30, color: colors.ink },
+  xpBalloon: {
+    maxWidth: 300,
+    marginBottom: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#FFFFE1',
+    borderWidth: 1,
+    borderColor: '#000000',
+    boxShadow: '2px 3px 6px rgba(0,0,0,0.35)',
+  },
+  xpBalloonText: { fontFamily: fonts.body, fontSize: 15, color: '#000000', textAlign: 'center' },
   offlineText: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center' },
   offlineButton: { height: 48, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
   offlineButtonText: { fontFamily: fonts.display, fontSize: 18, color: roles.action.text },
