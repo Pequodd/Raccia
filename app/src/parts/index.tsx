@@ -39,6 +39,7 @@ export type ChatHeaderProps = {
   online: boolean;
   onBack?: () => void;
   onOpenProfile?: () => void; // direct chats: tap the title to see who that is
+  onCall?: (video: boolean) => void; // direct chats: audio / video call
   wide: boolean;
   topInset: number;
 };

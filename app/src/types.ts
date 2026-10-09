@@ -18,6 +18,22 @@ export type Me = Profile & { isAdmin: boolean; onboarded: boolean; push: boolean
 export type Member = User & { online: boolean; lastReadId: number; lastDeliveredId: number };
 
 export type MediaKind = 'image' | 'video' | 'voice' | 'circle';
+export const MEDIA_KINDS: readonly string[] = ['image', 'video', 'voice', 'circle'];
+
+// --- Calls (1:1, in direct chats) ---
+export type CallPeer = { id: number; name: string; avatar: string | null };
+export type CallInfo = { id: string; chatId: number; video: boolean; from: CallPeer; to: CallPeer };
+export type CallOutcome = 'ended' | 'missed' | 'declined' | 'canceled' | 'failed';
+export type CallSignal = { sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit };
+export type CallEvent =
+  | { type: 'call_ringing'; call: CallInfo }
+  | { type: 'call_incoming'; call: CallInfo }
+  | { type: 'call_accepted'; callId: string }
+  | { type: 'call_answered_elsewhere'; callId: string }
+  | { type: 'call_signal'; callId: string; data: CallSignal }
+  | { type: 'call_ended'; callId: string; outcome: CallOutcome }
+  | { type: 'call_busy'; chatId: number }
+  | { type: 'call_error'; error: string };
 
 // An attachment on the server: file is a path under /media.
 export type Media = { file: string; poster?: string; size: number; width: number | null; height: number | null; duration: number | null };
@@ -39,7 +55,7 @@ export type Message = {
   id: number;
   chatId: number;
   userId: number;
-  kind: 'text' | 'service' | 'meetup' | MediaKind;
+  kind: 'text' | 'service' | 'meetup' | 'call' | MediaKind;
   media: Media | null;
   meetup?: Meetup | null;
   forwardedFrom?: string | null; // «Переслано от …»
@@ -95,6 +111,7 @@ export type ServerEvent =
   | { type: 'typing'; chatId: number; userId: number; name: string }
   | { type: 'presence'; userId: number; online: boolean }
   | { type: 'meetup'; chatId: number; message: Message }
+  | CallEvent
   | { type: 'vote'; vote: Vote }
   | { type: 'vote_closed'; candidateId: number }
   | ({ type: 'vote_result' } & VoteResult);

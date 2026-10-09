@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Platform, Pressable, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { MEDIA_LABELS } from '../media/upload';
+import { messagePreview } from '../media/upload';
 import { setPrefs, usePrefs } from '../prefs';
 import { chirp, disablePush, enablePush, isIOS, isStandalone, pushState, type PushState } from '../push';
 import { makeStyles, useSkin } from '../skins';
@@ -282,8 +282,7 @@ export function InAppBanner() {
           </Text>
           <Text style={styles.bannerBody} numberOfLines={2}>
             {group ? `${message.name}: ` : ''}
-            {message.kind !== 'text' && message.kind !== 'service' ? `${MEDIA_LABELS[message.kind]} ` : ''}
-            {message.body}
+            {messagePreview(message)}
           </Text>
         </View>
       </Pressable>

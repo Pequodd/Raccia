@@ -75,7 +75,47 @@ cd "$APP_DIR/app" && npm ci --no-audit --no-fund
 rm -rf dist && npx expo export --platform web --output-dir dist
 chown -R oleg:oleg "$APP_DIR"
 
-say "6/7 Служба oleg"
+say "6/7 Служба oleg и сервер звонков (coturn)"
+# coturn relays calls when two phones can't reach each other directly (mobile networks,
+# home routers). Credentials are made per call by the Oleg server from a shared secret.
+apt-get install -y coturn openssl
+mkdir -p /etc/oleg
+[ -s /etc/oleg/turn.secret ] || openssl rand -hex 32 > /etc/oleg/turn.secret
+chmod 600 /etc/oleg/turn.secret
+TURN_SECRET=$(cat /etc/oleg/turn.secret)
+PUBLIC_IP=$(curl -fsS4 https://api.ipify.org 2>/dev/null || true)
+PRIVATE_IP=$(hostname -I | awk '{print $1}')
+EXTERNAL_IP="$PUBLIC_IP"
+# Cloud VPS often sit behind NAT (public 195.x → private 192.168.x): coturn must know both.
+if [ -n "$PUBLIC_IP" ] && [ -n "$PRIVATE_IP" ] && [ "$PUBLIC_IP" != "$PRIVATE_IP" ]; then EXTERNAL_IP="$PUBLIC_IP/$PRIVATE_IP"; fi
+cat > /etc/turnserver.conf <<TURN
+listening-port=3478
+fingerprint
+use-auth-secret
+static-auth-secret=$TURN_SECRET
+realm=$DOMAIN
+min-port=49160
+max-port=49260
+${EXTERNAL_IP:+external-ip=$EXTERNAL_IP}
+no-cli
+no-multicast-peers
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+total-quota=50
+stale-nonce=600
+TURN
+[ -f /etc/default/coturn ] && sed -i 's/^#\?TURNSERVER_ENABLED=.*/TURNSERVER_ENABLED=1/' /etc/default/coturn
+systemctl enable coturn >/dev/null 2>&1
+systemctl restart coturn
+if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
+  ufw allow 3478 >/dev/null && ufw allow 49160:49260/udp >/dev/null
+fi
+# Secrets for the oleg service, readable by root and the service only.
+printf 'TURN_HOST=%s\nTURN_SECRET=%s\n' "$DOMAIN" "$TURN_SECRET" > /etc/oleg/env
+chown root:oleg /etc/oleg/env && chmod 640 /etc/oleg/env
+
 cat > /etc/systemd/system/oleg.service <<UNIT
 [Unit]
 Description=Oleg messenger
@@ -89,6 +129,7 @@ Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=3000
 Environment=DB_FILE=$DATA_DIR/oleg.db
+EnvironmentFile=-/etc/oleg/env
 ExecStart=$NODE_BIN --no-warnings=ExperimentalWarning src/index.js
 Restart=always
 RestartSec=3
@@ -124,4 +165,5 @@ if [ -n "$my_ip" ] && [ "$dns_ip" != "$my_ip" ]; then
 fi
 echo "Готово! Олег: https://$DOMAIN/"
 echo "Первый вход: «Уже есть инвайт?» → поле инвайта пустое → ник и пароль. Вы станете основателем."
+echo "Звонки: в панели reg.ru (если там есть файрвол) откройте порт 3478 (UDP и TCP) и UDP 49160–49260."
 echo "Обновить потом: запустите эту же команду ещё раз."

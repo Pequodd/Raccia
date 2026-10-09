@@ -5,6 +5,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewStyle 
 import Svg, { Path } from 'react-native-svg';
 import { TitleStrip } from '../components/heroes';
 import { avatarSource, stickers } from '../components/y2k';
+import { CallButtons } from '../calls/CallButtons';
 import { ToolGlyph, type ToolIcon } from '../media/ComposerTools';
 import type { ChatHeaderProps, ChatRowProps, ComposerProps, ListHeaderProps, Parts, TabItem } from './index';
 
@@ -130,7 +131,7 @@ function ChatRow({ index, title, preview, typing, time, unread, isNew, online, a
   );
 }
 
-function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, wide, topInset }: ChatHeaderProps) {
+function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, onCall, wide, topInset }: ChatHeaderProps) {
   return (
     <View style={[s.header, { paddingTop: wide ? 0 : topInset }]}>
       <LinearGradient colors={['#454A5C', '#2C2F3B']} style={StyleSheet.absoluteFill} />
@@ -149,6 +150,7 @@ function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, wi
             {subtitle}
           </Text>
         </Pressable>
+        {onCall ? <CallButtons onCall={onCall} color={C.green} /> : null}
         <Pressable onPress={onOpenProfile} disabled={!onOpenProfile}>
           <Tile name={title} avatar={avatar} size={38} gold online={online} />
         </Pressable>

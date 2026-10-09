@@ -25,7 +25,9 @@ const voteMs = Number(process.env.VOTE_MS) || undefined;
 const uploadDir = process.env.UPLOAD_DIR || join(dirname(DB_FILE), 'uploads');
 // Push services want a contact for the sender; set VAPID_SUBJECT=mailto:you@example.com.
 const subject = process.env.VAPID_SUBJECT || 'mailto:oleg@example.com';
-const { app, server, wss } = createServer(db, { voteMs, uploadDir, push: { subject } });
+// Calls: TURN_HOST=your-domain.ru and TURN_SECRET=<coturn static-auth-secret> (install.sh sets both).
+const turn = { turnHost: process.env.TURN_HOST, turnSecret: process.env.TURN_SECRET };
+const { app, server, wss } = createServer(db, { voteMs, uploadDir, push: { subject }, turn });
 
 // Serve the built web version (app/dist) from the same address, if it has been built:
 // one port for everything — handy in Codespaces and on a single server.

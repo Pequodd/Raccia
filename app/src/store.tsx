@@ -3,7 +3,7 @@ import { AppState, Platform } from 'react-native';
 import { api } from './api';
 import { Socket } from './socket';
 import { uploadMedia } from './media/upload';
-import type { Chat, MediaDraft, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
+import type { CallEvent, Chat, MediaDraft, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
 
 type ChatMessages = { items: Message[]; hasMore: boolean; loaded: boolean };
 
@@ -222,6 +222,9 @@ type Messenger = State & {
   sendMessage: (chatId: number, body: string) => void;
   sendMedia: (chatId: number, draft: MediaDraft) => void;
   replaceMessage: (message: Message) => void;
+  // Calls: raw socket messages out, call events in (see src/calls).
+  sendSocket: (data: object) => void;
+  onCallEvent: (listener: (event: CallEvent) => void) => () => void;
   retryMessage: (item: PendingMessage) => void;
   markRead: (chatId: number) => void;
   notifyTyping: (chatId: number) => void;
@@ -247,6 +250,7 @@ export function MessengerProvider({
   const [state, dispatch] = useReducer(reducer, initialState);
   const [me, setMe] = useState(initialMe);
   const [incoming, setIncoming] = useState<Incoming | null>(null);
+  const callListeners = useRef(new Set<(event: CallEvent) => void>());
   const socketRef = useRef<Socket | null>(null);
   const activeRef = useRef(activeChatId);
   activeRef.current = activeChatId;
@@ -276,6 +280,10 @@ export function MessengerProvider({
 
   useEffect(() => {
     const onEvent = (event: ServerEvent) => {
+      if (event.type.startsWith('call_')) {
+        for (const l of callListeners.current) l(event as CallEvent);
+        return;
+      }
       switch (event.type) {
         case 'ready':
         case 'me':
@@ -361,6 +369,13 @@ export function MessengerProvider({
 
   const dismissIncoming = useCallback(() => setIncoming(null), []);
   const replaceMessage = useCallback((message: Message) => dispatch({ type: 'replaceMessage', message }), []);
+  const sendSocket = useCallback((data: object) => socketRef.current?.send(data), []);
+  const onCallEvent = useCallback((listener: (event: CallEvent) => void) => {
+    callListeners.current.add(listener);
+    return () => {
+      callListeners.current.delete(listener);
+    };
+  }, []);
 
   const castVote = useCallback(async (candidateId: number, vote: 'for' | 'against' | null) => {
     const res = await api.vote(candidateId, vote);
@@ -466,13 +481,15 @@ export function MessengerProvider({
       sendMessage,
       sendMedia,
       replaceMessage,
+      sendSocket,
+      onCallEvent,
       retryMessage: deliver,
       markRead,
       notifyTyping,
       openDirect,
       createGroup,
     }),
-    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, sendMedia, replaceMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
+    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, sendMedia, replaceMessage, sendSocket, onCallEvent, deliver, markRead, notifyTyping, openDirect, createGroup]
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

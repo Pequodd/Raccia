@@ -16,6 +16,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ForwardSheet, MessageActions } from '../components/forward';
 import { MeetupCard, MeetupSheet } from '../components/meetup';
+import { useCalls } from '../calls/CallProvider';
+import { CallButtons } from '../calls/CallButtons';
 import { UserCard } from '../components/profile';
 import { CircleRecorder } from '../media/CircleRecorder';
 import { AttachPreview, AttachSheet, RecordingBar, ToolButton } from '../media/ComposerTools';
@@ -27,7 +29,7 @@ import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../compone
 import { makeStyles, radius, useSkin } from '../skins';
 import { useParts } from '../parts';
 import { useMessenger } from '../store';
-import type { MediaDraft, Message, PendingMessage } from '../types';
+import { MEDIA_KINDS, type MediaDraft, type MediaKind, type Message, type PendingMessage } from '../types';
 import { authorColor, clockTime, dayLabel, diagonal, plural } from '../y2k';
 
 type Row =
@@ -53,6 +55,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const [loadingOlder, setLoadingOlder] = useState(false);
   const parts = useParts();
   const [profileId, setProfileId] = useState<number | null>(null);
+  const calls = useCalls();
   const [attaching, setAttaching] = useState(false);
   const [draft, setDraft] = useState<MediaDraft | null>(null);
   const [circling, setCircling] = useState(false);
@@ -120,6 +123,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
   const other = chat.type === 'direct' ? others[0] : undefined;
   const openProfile = other ? () => setProfileId(other.id) : undefined;
+  const startCall = other ? (video: boolean) => calls.start(chatId, video, { name: chat.title, avatar: other.avatar }) : undefined;
   let subtitle: string;
   if (t) subtitle = chat.type === 'group' ? `${t.name} ${skin.copy.typing}` : skin.copy.typing;
   else if (chat.type === 'group') {
@@ -245,6 +249,26 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       case 'message': {
         const m = item.message;
         const mine = m.userId === me.id;
+        if (m.kind === 'call') {
+          const missed = m.media && 'outcome' in m.media && (m.media as { outcome?: string }).outcome !== 'ended';
+          const video = !!(m.media as { video?: boolean } | null)?.video;
+          return (
+            <View style={styles.serviceRow}>
+              <Pressable
+                onPress={() => startCall?.(video)}
+                disabled={!startCall}
+                style={[styles.callPill, missed && !mine && styles.callPillMissed]}
+                accessibilityRole="button"
+                accessibilityLabel={`${m.body}. Перезвонить`}
+              >
+                <Text style={[styles.callPillText, missed && !mine && { color: colors.dangerText }]}>
+                  {video ? '📹' : '📞'} {mine ? 'Исходящий: ' : ''}
+                  {m.body} · {clockTime(m.createdAt)}
+                </Text>
+              </Pressable>
+            </View>
+          );
+        }
         if (m.kind === 'meetup') {
           return (
             <Pressable onLongPress={() => setActing(m)} delayLongPress={400}>
@@ -253,9 +277,9 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
           );
         }
         const media: MediaView | null =
-          m.media && m.kind !== 'text' && m.kind !== 'service'
+          m.media && MEDIA_KINDS.includes(m.kind)
             ? {
-                kind: m.kind,
+                kind: m.kind as MediaKind,
                 uri: mediaUrl(m.media.file),
                 poster: m.media.poster ? mediaUrl(m.media.poster) : undefined,
                 width: m.media.width,
@@ -321,6 +345,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
           online={!!other?.online}
           onBack={wide ? undefined : onBack}
           onOpenProfile={openProfile}
+          onCall={startCall}
           wide={wide}
           topInset={insets.top}
         />
@@ -346,6 +371,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
                 {subtitle}
               </Text>
             </Pressable>
+            {startCall ? <CallButtons onCall={startCall} /> : null}
             {wide ? null : (
               <Pressable onPress={openProfile} disabled={!openProfile} accessibilityLabel={openProfile ? `Профиль: ${chat.title}` : undefined}>
                 <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />
@@ -549,6 +575,9 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   bubbleRow: { flexDirection: 'row', flexShrink: 0 },
   bubbleMedia: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 5 },
   captionPad: { paddingHorizontal: 8 },
+  callPill: { maxWidth: '86%', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.serviceBg },
+  callPillMissed: { backgroundColor: colors.dangerBg },
+  callPillText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.serviceText, textAlign: 'center' },
   forwarded: { fontFamily: fonts.bodyBold, fontSize: 12, marginBottom: 2 },
   circleRow: { gap: 3, flexShrink: 0 },
   circleMeta: { fontFamily: fonts.mono, fontSize: 11, color: colors.text3, paddingHorizontal: 8 },

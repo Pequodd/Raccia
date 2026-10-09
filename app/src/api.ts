@@ -77,6 +77,7 @@ export const api = {
     request<{ message: Message }>(`/api/chats/${chatId}/meetups`, meetup),
   answerMeetup: (meetupId: number, answer: 'yes' | 'no' | null) =>
     request<{ message: Message }>(`/api/meetups/${meetupId}/answer`, { answer }),
+  turn: () => request<{ iceServers: RTCIceServer[] }>('/api/turn'),
   forward: (messageId: number, chatIds: number[]) =>
     request<{ messages: Message[] }>(`/api/messages/${messageId}/forward`, { chatIds }),
   markRead: (chatId: number, messageId: number) =>

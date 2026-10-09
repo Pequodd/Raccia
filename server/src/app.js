@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword, newToken } from './auth.js';
 import { createPush } from './push.js';
 import { MediaError, saveMedia } from './media.js';
 import { createMeetups, MeetupError } from './meetups.js';
+import { createCalls, formatCallDuration, iceServers } from './calls.js';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 const MAX_MESSAGE_LENGTH = 4000;
@@ -17,7 +18,7 @@ const MAX_BIO_LENGTH = 140;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 const MAX_CAPTION_LENGTH = 1000;
 // How an attachment reads in a push and in the chat list.
-export const MEDIA_LABELS = { image: '📷 Фото', video: '🎬 Видео', voice: '🎤 Голосовое', circle: '⭕ Кружок', meetup: '🍺 Сходка' };
+export const MEDIA_LABELS = { call: '📞 Звонок', image: '📷 Фото', video: '🎬 Видео', voice: '🎤 Голосовое', circle: '⭕ Кружок', meetup: '🍺 Сходка' };
 // Meetup times are written for people in Chelyabinsk (UTC+5) unless OLEG_TZ says otherwise.
 const TIME_ZONE = process.env.OLEG_TZ || 'Asia/Yekaterinburg';
 const meetupTime = (ts) =>
@@ -50,7 +51,8 @@ function imageType(buf) {
 }
 
 // uploadDir: where photos go (served at /media). push: options for createPush (tests swap the sender).
-export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOptions } = {}) {
+// turn: { turnHost, turnSecret } for calls (coturn on the same machine; see deploy/install.sh).
+export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOptions, turn = {} } = {}) {
   const app = express();
   const push = createPush(db, pushOptions);
   const meetups = createMeetups(db);
@@ -301,7 +303,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     const chat = q.chatInfo.get(chatId);
     const label = MEDIA_LABELS[kind];
     const caption = body.length > 180 ? body.slice(0, 180) + '…' : body;
-    const text = label ? (caption ? `${label} · ${caption}` : label) : caption;
+    const text = kind === 'call' ? `📞 ${caption}` : label ? (caption ? `${label} · ${caption}` : label) : caption;
     for (const uid of members) {
       if (uid === userId || isWatching(uid)) continue;
       push.notify(uid, {
@@ -716,6 +718,38 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     res.status(201).json({ message: postMessage(req.chatId, req.user.id, caption, kind, media) });
   });
 
+  // --- Calls ---
+
+  const CALL_TEXT = {
+    missed: (v) => (v ? 'Пропущенный видеозвонок' : 'Пропущенный звонок'),
+    declined: () => 'Звонок отклонён',
+    canceled: () => 'Звонок отменён',
+    failed: () => 'Звонок сорвался',
+  };
+  const calls = createCalls({
+    send,
+    isWatching,
+    notify: (uid, payload) => push.notify(uid, payload),
+    userCard: (id) => {
+      const u = userView(q.userById.get(id));
+      return { id: u.id, name: u.name, avatar: u.avatar };
+    },
+    directPeer: (chatId, userId) => {
+      const chat = q.chatInfo.get(chatId);
+      if (!chat || chat.type !== 'direct' || !q.isMember.get(chatId, userId)) return null;
+      return memberIds(chatId).find((id) => id !== userId) ?? null;
+    },
+    postCall: (call, outcome, duration) => {
+      const body =
+        outcome === 'ended'
+          ? `${call.video ? 'Видеозвонок' : 'Звонок'} · ${formatCallDuration(duration)}`
+          : CALL_TEXT[outcome](call.video);
+      postMessage(call.chatId, call.from, body, 'call', { video: call.video, outcome, duration });
+    },
+  });
+
+  app.get('/api/turn', requireAuth, (req, res) => res.json({ iceServers: iceServers(req.user.id, turn) }));
+
   // --- Сходка ---
 
   const requireAdmin = (req, res, next) =>
@@ -829,6 +863,10 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       } catch {
         return;
       }
+      if (typeof msg?.type === 'string' && msg.type.startsWith('call_')) {
+        calls.handle(user.id, msg);
+        return;
+      }
       if (msg?.type === 'visibility') {
         ws.visible = Boolean(msg.visible);
         return;
@@ -853,6 +891,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     });
 
     ws.send(JSON.stringify({ type: 'ready', user: meView(user) }));
+    calls.onConnect(user.id);
 
     // Everything sent while this user was offline is delivered now.
     for (const row of q.undelivered.all(user.id)) {
@@ -873,6 +912,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
   server.on('close', () => {
     clearInterval(heartbeat);
     for (const timer of voteTimers.values()) clearTimeout(timer);
+    calls.stop();
   });
 
   return { app, server, wss };

@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { CallButtons } from '../calls/CallButtons';
 import { Lollipop } from '../components/y2k';
 import { clockTime } from '../y2k';
 import type { ChatHeaderProps, ListHeaderProps, Parts, TabItem } from './index';
@@ -87,7 +88,7 @@ function ListHeader({ myName, myAvatar, connected, query, onQuery, onNewChat, to
   );
 }
 
-function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, wide, topInset }: ChatHeaderProps) {
+function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, onCall, wide, topInset }: ChatHeaderProps) {
   return (
     <View style={s.header}>
       <TitleBar title={`${title} — Беседа`} icon="💬" onClose={onBack} topInset={wide ? 0 : topInset} />
@@ -117,6 +118,7 @@ function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, wi
             </Text>
           </View>
         </Pressable>
+        {onCall ? <CallButtons onCall={onCall} color="#0A50D8" /> : null}
       </View>
     </View>
   );

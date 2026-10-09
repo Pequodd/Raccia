@@ -11,6 +11,8 @@ import { makeStyles, radius, SkinProvider, useSkin } from './src/skins';
 import { skinFonts } from './src/skins/fonts';
 import { ProfileScreen, SettingsScreen } from './src/screens/AccountScreens';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { CallProvider } from './src/calls/CallProvider';
+import { CallScreen } from './src/calls/CallScreen';
 import { InAppBanner, InstallSheet } from './src/components/notify';
 import { chatFromUrl, disablePush, onOpenFromNotification, registerServiceWorker, resubscribe, setUnreadBadge } from './src/push';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -158,7 +160,9 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
   useEffect(() => onOpenFromNotification((chatId) => chatId && setActiveChat(chatId)), [setActiveChat]);
   return (
     <MessengerProvider me={session.user} token={session.token} activeChatId={activeChatId} setActiveChat={setActiveChat}>
-      <Shell onLogout={onLogout} openTick={openTick} />
+      <CallProvider>
+        <Shell onLogout={onLogout} openTick={openTick} />
+      </CallProvider>
     </MessengerProvider>
   );
 }
@@ -171,6 +175,7 @@ function Shell({ onLogout, openTick }: { onLogout: () => void; openTick: number 
     <View style={{ flex: 1 }}>
       <ShellBody onLogout={onLogout} openTick={openTick} />
       <InAppBanner />
+      <CallScreen />
     </View>
   );
 }

@@ -1,8 +1,15 @@
 import { getAuthToken } from '../api';
 import { API_URL } from '../config';
-import type { MediaDraft, Message, MediaKind } from '../types';
+import type { MediaDraft, Message } from '../types';
 
-export const MEDIA_LABELS: Record<MediaKind | 'meetup', string> = {
+// One line for a message in the chat list and the banner: «📷 Фото · подпись», «📞 Пропущенный звонок».
+export function messagePreview(m: Pick<Message, 'kind' | 'body'>) {
+  if (m.kind === 'call') return `📞 ${m.body}`;
+  const label = m.kind in MEDIA_LABELS ? MEDIA_LABELS[m.kind as keyof typeof MEDIA_LABELS] : null;
+  return label ? (m.body ? `${label} · ${m.body}` : label) : m.body;
+}
+
+export const MEDIA_LABELS = {
   meetup: '🍺 Сходка',
   image: '📷 Фото',
   video: '🎬 Видео',
