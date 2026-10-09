@@ -7,6 +7,7 @@ import { WebSocketServer } from 'ws';
 import { hashPassword, verifyPassword, newToken } from './auth.js';
 import { createPush } from './push.js';
 import { MediaError, saveMedia } from './media.js';
+import { createMeetups, MeetupError } from './meetups.js';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 const MAX_MESSAGE_LENGTH = 4000;
@@ -16,7 +17,11 @@ const MAX_BIO_LENGTH = 140;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 const MAX_CAPTION_LENGTH = 1000;
 // How an attachment reads in a push and in the chat list.
-export const MEDIA_LABELS = { image: '📷 Фото', video: '🎬 Видео', voice: '🎤 Голосовое', circle: '⭕ Кружок' };
+export const MEDIA_LABELS = { image: '📷 Фото', video: '🎬 Видео', voice: '🎤 Голосовое', circle: '⭕ Кружок', meetup: '🍺 Сходка' };
+// Meetup times are written for people in Chelyabinsk (UTC+5) unless OLEG_TZ says otherwise.
+const TIME_ZONE = process.env.OLEG_TZ || 'Asia/Yekaterinburg';
+const meetupTime = (ts) =>
+  new Date(ts).toLocaleString('ru-RU', { timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 const VOTE_MS = 5 * 60_000;
 
 // Sticker ids a user may pick as an avatar (app/assets/stickers/webp).
@@ -48,6 +53,7 @@ function imageType(buf) {
 export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOptions } = {}) {
   const app = express();
   const push = createPush(db, pushOptions);
+  const meetups = createMeetups(db);
   if (uploadDir) mkdirSync(uploadDir, { recursive: true });
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
@@ -200,12 +206,27 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
   }
 
   function messageView(row) {
+    const media = row.media ? JSON.parse(row.media) : null;
+    if (row.kind === 'meetup' && media?.meetupId) {
+      const nameOf = (id) => q.userById.get(id)?.name ?? '?';
+      return {
+        id: row.id,
+        chatId: row.chat_id,
+        userId: row.user_id,
+        kind: row.kind,
+        media: null,
+        meetup: meetups.view(media.meetupId, nameOf, memberIds(row.chat_id).length),
+        name: row.name,
+        body: row.body,
+        createdAt: row.created_at,
+      };
+    }
     return {
       id: row.id,
       chatId: row.chat_id,
       userId: row.user_id,
       kind: row.kind,
-      media: row.media ? JSON.parse(row.media) : null,
+      media,
       name: row.name,
       body: row.body,
       createdAt: row.created_at,
@@ -691,6 +712,54 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       duration: probedDuration ?? num(req.query.duration, 6 * 3600_000),
     };
     res.status(201).json({ message: postMessage(req.chatId, req.user.id, caption, kind, media) });
+  });
+
+  // --- Сходка ---
+
+  const requireAdmin = (req, res, next) =>
+    req.user.is_admin ? next() : res.status(403).json({ error: 'Бары ведёт только супер-админ' });
+  const meetupErrors = (fn) => (req, res) => {
+    try {
+      fn(req, res);
+    } catch (err) {
+      if (err instanceof MeetupError) return res.status(err.status).json({ error: err.message });
+      throw err;
+    }
+  };
+
+  app.get('/api/bars', requireAuth, (req, res) => res.json({ bars: meetups.bars() }));
+  app.post('/api/bars', requireAuth, requireAdmin, meetupErrors((req, res) => res.status(201).json({ bar: meetups.addBar(req.body) })));
+  app.post('/api/bars/:id', requireAuth, requireAdmin, meetupErrors((req, res) => res.json({ bar: meetups.updateBar(Number(req.params.id), req.body) })));
+  app.post('/api/bars/:id/delete', requireAuth, requireAdmin, (req, res) => {
+    meetups.deleteBar(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  app.post(
+    '/api/chats/:id/meetups',
+    requireAuth,
+    requireMember,
+    meetupErrors((req, res) => {
+      const { id, place, startsAt } = meetups.create(req.chatId, req.user.id, req.body);
+      const body = `${place.name} · ${meetupTime(startsAt)}`;
+      const message = postMessage(req.chatId, req.user.id, body, 'meetup', { meetupId: id });
+      meetups.attach(id, message.id);
+      res.status(201).json({ message: messageView(q.messageById.get(message.id)) });
+    })
+  );
+
+  app.post('/api/meetups/:id/answer', requireAuth, (req, res) => {
+    const m = meetups.get(Number(req.params.id));
+    if (!m || !q.isMember.get(m.chat_id, req.user.id)) return res.status(404).json({ error: 'Сходка не найдена' });
+    try {
+      meetups.setAnswer(m.id, req.user.id, req.body?.answer ?? null);
+    } catch (err) {
+      if (err instanceof MeetupError) return res.status(err.status).json({ error: err.message });
+      throw err;
+    }
+    const message = messageView(q.messageById.get(m.message_id));
+    for (const uid of memberIds(m.chat_id)) send(uid, { type: 'meetup', chatId: m.chat_id, message });
+    res.json({ message });
   });
 
   app.post('/api/chats/:id/read', requireAuth, requireMember, (req, res) => {

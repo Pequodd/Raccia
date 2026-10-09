@@ -8,6 +8,7 @@ import { diagonal } from '../y2k';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMessenger } from '../store';
 import { InviteCard } from '../components/initiation';
+import { BarsAdmin } from '../components/meetup';
 import { NotificationSettings } from '../components/notify';
 import { CameraButton, ProfileFacts, statusLabel, usePhotoUpload } from '../components/profile';
 
@@ -193,6 +194,7 @@ export function SkinPicker() {
 
 export function SettingsScreen({ onLogout, wide }: { onLogout: () => void; wide: boolean }) {
   const skin = useSkin();
+  const { me } = useMessenger();
   const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
@@ -204,6 +206,11 @@ export function SettingsScreen({ onLogout, wide }: { onLogout: () => void; wide:
       <View style={styles.card}>
         <NotificationSettings />
       </View>
+      {me.isAdmin ? (
+        <View style={styles.card}>
+          <BarsAdmin />
+        </View>
+      ) : null}
       <View style={styles.card}>
         <Plastic colors={roles.danger.grad} style={styles.logout} onPress={onLogout} accessibilityLabel={skin.copy.logout}>
           <Text style={[styles.logoutText, { color: roles.danger.text }]}>{skin.copy.logout}</Text>

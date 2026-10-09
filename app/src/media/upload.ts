@@ -2,7 +2,8 @@ import { getAuthToken } from '../api';
 import { API_URL } from '../config';
 import type { MediaDraft, Message, MediaKind } from '../types';
 
-export const MEDIA_LABELS: Record<MediaKind, string> = {
+export const MEDIA_LABELS: Record<MediaKind | 'meetup', string> = {
+  meetup: '🍺 Сходка',
   image: '📷 Фото',
   video: '🎬 Видео',
   voice: '🎤 Голосовое',

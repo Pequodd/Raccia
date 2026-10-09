@@ -22,12 +22,27 @@ export type MediaKind = 'image' | 'video' | 'voice' | 'circle';
 // An attachment on the server: file is a path under /media.
 export type Media = { file: string; poster?: string; size: number; width: number | null; height: number | null; duration: number | null };
 
+// «Сходка»: a bar (or any place) and a time; friends answer «Иду» / «Не иду».
+export type Place = { name: string; address: string | null; phone: string | null; mapUrl: string; note: string | null };
+export type Bar = Place & { id: number };
+export type Meetup = {
+  id: number;
+  number: number; // «Заявка №4815»
+  place: Place;
+  startsAt: number;
+  createdBy: { id: number; name: string };
+  going: { id: number; name: string }[];
+  notGoing: { id: number; name: string }[];
+  undecided: number;
+};
+
 export type Message = {
   id: number;
   chatId: number;
   userId: number;
-  kind: 'text' | 'service' | MediaKind;
+  kind: 'text' | 'service' | 'meetup' | MediaKind;
   media: Media | null;
+  meetup?: Meetup | null;
   name: string;
   body: string; // text, or the caption of an attachment
   createdAt: number;
@@ -79,6 +94,7 @@ export type ServerEvent =
   | { type: 'delivered'; chatId: number; userId: number; messageId: number }
   | { type: 'typing'; chatId: number; userId: number; name: string }
   | { type: 'presence'; userId: number; online: boolean }
+  | { type: 'meetup'; chatId: number; message: Message }
   | { type: 'vote'; vote: Vote }
   | { type: 'vote_closed'; candidateId: number }
   | ({ type: 'vote_result' } & VoteResult);

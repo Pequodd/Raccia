@@ -55,7 +55,17 @@ export function ToolButton({ icon, label, onPress, color }: { icon: ToolIcon; la
 }
 
 // «Скрепка»: gallery or camera.
-export function AttachSheet({ visible, onPick, onClose }: { visible: boolean; onPick: (source: 'library' | 'camera') => void; onClose: () => void }) {
+export function AttachSheet({
+  visible,
+  onPick,
+  onMeetup,
+  onClose,
+}: {
+  visible: boolean;
+  onPick: (source: 'library' | 'camera') => void;
+  onMeetup: () => void;
+  onClose: () => void;
+}) {
   const styles = useStyles();
   const { colors } = useSkin();
   const insets = useSafeAreaInsets();
@@ -86,6 +96,22 @@ export function AttachSheet({ visible, onPick, onClose }: { visible: boolean; on
             </View>
           </Pressable>
         ))}
+        <Pressable
+          onPress={() => {
+            onClose();
+            onMeetup();
+          }}
+          style={({ pressed }) => [styles.option, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+        >
+          <View style={styles.optionIcon}>
+            <Text style={{ fontSize: 24 }}>🍺</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.optionTitle}>Сходка в бар</Text>
+            <Text style={styles.optionHint}>Место и время, друзья отметятся «Иду»</Text>
+          </View>
+        </Pressable>
         <Pressable onPress={onClose} style={styles.cancel} accessibilityRole="button">
           <Text style={styles.cancelText}>Отмена</Text>
         </Pressable>

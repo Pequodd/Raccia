@@ -90,6 +90,35 @@ export function openDb(file) {
     );
     CREATE INDEX IF NOT EXISTS push_subscriptions_user ON push_subscriptions(user_id);
 
+    -- «Сходка»: bars the super-admin keeps, meetups posted into chats, and who is going.
+    CREATE TABLE IF NOT EXISTS bars (
+      id         INTEGER PRIMARY KEY,
+      name       TEXT NOT NULL,
+      address    TEXT,
+      phone      TEXT,
+      map_url    TEXT,
+      note       TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS meetups (
+      id         INTEGER PRIMARY KEY,
+      chat_id    INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+      message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+      bar_id     INTEGER REFERENCES bars(id) ON DELETE SET NULL,
+      place      TEXT NOT NULL, -- JSON copy of the place, so a deleted bar keeps old meetups readable
+      starts_at  INTEGER NOT NULL,
+      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS meetup_answers (
+      meetup_id INTEGER NOT NULL REFERENCES meetups(id) ON DELETE CASCADE,
+      user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      answer    TEXT NOT NULL CHECK (answer IN ('yes', 'no')),
+      PRIMARY KEY (meetup_id, user_id)
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL

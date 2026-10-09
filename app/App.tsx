@@ -147,28 +147,35 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
   const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   // Opened from a notification: start in that chat.
-  const [activeChatId, setActiveChat] = useState<number | null>(chatFromUrl);
-  useEffect(() => onOpenFromNotification((chatId) => chatId && setActiveChat(chatId)), []);
+  const [activeChatId, setActiveChatId] = useState<number | null>(chatFromUrl);
+  // Bumped on every «open this chat», even the one already open: the shell then leaves
+  // Profile/Settings for the conversation.
+  const [openTick, setOpenTick] = useState(0);
+  const setActiveChat = useCallback((chatId: number | null) => {
+    setActiveChatId(chatId);
+    if (chatId) setOpenTick((n) => n + 1);
+  }, []);
+  useEffect(() => onOpenFromNotification((chatId) => chatId && setActiveChat(chatId)), [setActiveChat]);
   return (
     <MessengerProvider me={session.user} token={session.token} activeChatId={activeChatId} setActiveChat={setActiveChat}>
-      <Shell onLogout={onLogout} />
+      <Shell onLogout={onLogout} openTick={openTick} />
     </MessengerProvider>
   );
 }
 
 // First run goes through onboarding; afterwards the messenger with the in-app banner on top.
-function Shell({ onLogout }: { onLogout: () => void }) {
+function Shell({ onLogout, openTick }: { onLogout: () => void; openTick: number }) {
   const { me } = useMessenger();
   if (!me.onboarded) return <OnboardingScreen />;
   return (
     <View style={{ flex: 1 }}>
-      <ShellBody onLogout={onLogout} />
+      <ShellBody onLogout={onLogout} openTick={openTick} />
       <InAppBanner />
     </View>
   );
 }
 
-function ShellBody({ onLogout }: { onLogout: () => void }) {
+function ShellBody({ onLogout, openTick }: { onLogout: () => void; openTick: number }) {
   const skin = useSkin();
   const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
@@ -183,8 +190,8 @@ function ShellBody({ onLogout }: { onLogout: () => void }) {
 
   // Opening a chat from anywhere brings the conversation into view.
   useEffect(() => {
-    if (activeChatId) setTab('chats');
-  }, [activeChatId]);
+    if (openTick) setTab('chats');
+  }, [openTick]);
 
   const list = composing ? (
     <NewChatScreen mode={composing} onClose={() => setComposing(null)} wide={wide} />

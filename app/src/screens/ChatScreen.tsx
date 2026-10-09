@@ -14,6 +14,7 @@ import {
   type TextInputKeyPressEventData,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MeetupCard, MeetupSheet } from '../components/meetup';
 import { UserCard } from '../components/profile';
 import { CircleRecorder } from '../media/CircleRecorder';
 import { AttachPreview, AttachSheet, RecordingBar, ToolButton } from '../media/ComposerTools';
@@ -54,6 +55,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const [attaching, setAttaching] = useState(false);
   const [draft, setDraft] = useState<MediaDraft | null>(null);
   const [circling, setCircling] = useState(false);
+  const [meeting, setMeeting] = useState(false);
   const voice = useVoiceRecorder();
   useEffect(() => {
     if (voice.error) setError(voice.error);
@@ -231,6 +233,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       case 'message': {
         const m = item.message;
         const mine = m.userId === me.id;
+        if (m.kind === 'meetup') return <MeetupCard message={m} />;
         const media: MediaView | null =
           m.media && m.kind !== 'text' && m.kind !== 'service'
             ? {
@@ -348,7 +351,8 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <AttachSheet visible={attaching} onPick={pick} onClose={() => setAttaching(false)} />
+      <AttachSheet visible={attaching} onPick={pick} onMeetup={() => setMeeting(true)} onClose={() => setAttaching(false)} />
+      <MeetupSheet chatId={chatId} visible={meeting} onClose={() => setMeeting(false)} />
       <AttachPreview
         draft={draft}
         onClose={() => setDraft(null)}

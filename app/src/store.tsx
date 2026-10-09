@@ -28,6 +28,7 @@ type Action =
   | { type: 'pendingFail'; chatId: number; tempId: string; failed: boolean }
   | { type: 'pendingDrop'; chatId: number; tempId: string }
   | { type: 'pendingProgress'; chatId: number; tempId: string; progress: number }
+  | { type: 'replaceMessage'; message: Message }
   | { type: 'typing'; chatId: number; name: string }
   | { type: 'votes'; votes: Vote[] }
   | { type: 'vote'; vote: Vote }
@@ -129,6 +130,17 @@ function reducer(state: State, action: Action): State {
       return { ...state, pending: { ...state.pending, [action.chatId]: list } };
     }
 
+    // A meetup card changed (someone answered): swap the message in place.
+    case 'replaceMessage': {
+      const { message } = action;
+      const bucket = state.messages[message.chatId];
+      const messages = bucket
+        ? { ...state.messages, [message.chatId]: { ...bucket, items: bucket.items.map((m) => (m.id === message.id ? message : m)) } }
+        : state.messages;
+      const chats = state.chats.map((c) => (c.lastMessage?.id === message.id ? { ...c, lastMessage: message } : c));
+      return { ...state, messages, chats };
+    }
+
     case 'pendingProgress': {
       const list = (state.pending[action.chatId] ?? []).map((p) =>
         p.tempId === action.tempId ? { ...p, progress: action.progress } : p
@@ -209,6 +221,7 @@ type Messenger = State & {
   loadMessages: (chatId: number, older?: boolean) => Promise<void>;
   sendMessage: (chatId: number, body: string) => void;
   sendMedia: (chatId: number, draft: MediaDraft) => void;
+  replaceMessage: (message: Message) => void;
   retryMessage: (item: PendingMessage) => void;
   markRead: (chatId: number) => void;
   notifyTyping: (chatId: number) => void;
@@ -312,6 +325,9 @@ export function MessengerProvider({
         case 'presence':
           dispatch({ type: 'presence', userId: event.userId, online: event.online });
           break;
+        case 'meetup':
+          dispatch({ type: 'replaceMessage', message: event.message });
+          break;
       }
     };
     const onStatus = (connected: boolean) => {
@@ -344,6 +360,7 @@ export function MessengerProvider({
   }, []);
 
   const dismissIncoming = useCallback(() => setIncoming(null), []);
+  const replaceMessage = useCallback((message: Message) => dispatch({ type: 'replaceMessage', message }), []);
 
   const castVote = useCallback(async (candidateId: number, vote: 'for' | 'against' | null) => {
     const res = await api.vote(candidateId, vote);
@@ -448,13 +465,14 @@ export function MessengerProvider({
       loadMessages,
       sendMessage,
       sendMedia,
+      replaceMessage,
       retryMessage: deliver,
       markRead,
       notifyTyping,
       openDirect,
       createGroup,
     }),
-    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, sendMedia, deliver, markRead, notifyTyping, openDirect, createGroup]
+    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, sendMedia, replaceMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

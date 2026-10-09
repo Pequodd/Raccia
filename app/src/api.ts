@@ -1,5 +1,5 @@
 import { API_URL } from './config';
-import type { Chat, Me, Message, Profile, User, Vote } from './types';
+import type { Bar, Chat, Me, Message, Profile, User, Vote } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -69,6 +69,14 @@ export const api = {
       `/api/chats/${chatId}/messages${before ? `?before=${before}` : ''}`
     ),
   send: (chatId: number, body: string) => request<{ message: Message }>(`/api/chats/${chatId}/messages`, { body }),
+  bars: () => request<{ bars: Bar[] }>('/api/bars'),
+  addBar: (bar: Partial<Bar>) => request<{ bar: Bar }>('/api/bars', bar),
+  updateBar: (id: number, bar: Partial<Bar>) => request<{ bar: Bar }>(`/api/bars/${id}`, bar),
+  deleteBar: (id: number) => request<{ ok: true }>(`/api/bars/${id}/delete`, {}),
+  createMeetup: (chatId: number, meetup: { barId?: number; place?: { name: string; address?: string }; startsAt: number }) =>
+    request<{ message: Message }>(`/api/chats/${chatId}/meetups`, meetup),
+  answerMeetup: (meetupId: number, answer: 'yes' | 'no' | null) =>
+    request<{ message: Message }>(`/api/meetups/${meetupId}/answer`, { answer }),
   markRead: (chatId: number, messageId: number) =>
     request<{ ok: true }>(`/api/chats/${chatId}/read`, { messageId }),
 };
