@@ -20,6 +20,7 @@ type ConfState = {
   cameraOff: boolean;
   sharing: boolean;
   screen: MediaStream | null; // our own screen, for the preview tile
+  screenAudio: 'on' | 'off' | 'none'; // sound of the shared tab/screen (a film with friends)
 };
 
 type Invite = ConfInfo & { host: CallPeer };
@@ -37,6 +38,7 @@ type Conferences = {
   toggleMute: () => void;
   toggleCamera: () => void;
   toggleScreen: () => void;
+  toggleScreenAudio: () => void;
 };
 
 const ConfContext = createContext<Conferences | null>(null);
@@ -58,6 +60,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   const ice = useRef<RTCIceServer[] | null>(null);
   const camTrack = useRef<MediaStreamTrack | null>(null);
   const screenTrack = useRef<MediaStreamTrack | null>(null);
+  const screenAudioTrack = useRef<MediaStreamTrack | null>(null);
   const inviteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fail = useCallback((text: string) => {
@@ -81,6 +84,8 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     pendingIce.current.clear();
     screenTrack.current?.stop();
     screenTrack.current = null;
+    screenAudioTrack.current?.stop();
+    screenAudioTrack.current = null;
     camTrack.current = null;
     localRef.current?.getTracks().forEach((t) => t.stop());
     localRef.current = null;
@@ -98,6 +103,13 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
 
   const videoSender = (pc: RTCPeerConnection) =>
     pc.getTransceivers().find((t) => (t.sender.track ?? t.receiver.track)?.kind === 'video')?.sender;
+  // Every connection has a second audio slot, kept for the sound of a shared screen.
+  const screenAudioSender = (pc: RTCPeerConnection) =>
+    pc.getTransceivers().filter((t) => (t.sender.track ?? t.receiver.track)?.kind === 'audio')[1]?.sender;
+  const sendScreen = (pc: RTCPeerConnection) => {
+    if (screenTrack.current) videoSender(pc)?.replaceTrack(screenTrack.current).catch(() => {});
+    if (screenAudioTrack.current) screenAudioSender(pc)?.replaceTrack(screenAudioTrack.current).catch(() => {});
+  };
 
   const peerConnection = useCallback(
     (peerId: number) => {
@@ -127,6 +139,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       const pc = peerConnection(peerId);
       // Audio-only: keep a video slot open so a screen can be shown later without renegotiating.
       if (!localRef.current?.getVideoTracks().length) pc.addTransceiver('video', { direction: 'sendrecv' });
+      pc.addTransceiver('audio', { direction: 'sendrecv' }); // screen sound slot
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       signal(peerId, { sdp: pc.localDescription!.toJSON() });
@@ -144,7 +157,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
           setInvite(null);
           const peers: Record<number, ConfPeer> = {};
           for (const p of event.peers) peers[p.id] = { ...p, stream: null };
-          setConf({ info: event.conf, startedAt: Date.now(), peers, local: localRef.current, muted: false, cameraOff: false, sharing: false, screen: null });
+          setConf({ info: event.conf, startedAt: Date.now(), peers, local: localRef.current, muted: false, cameraOff: false, sharing: false, screen: null, screenAudio: 'none' });
           confRef.current = { info: event.conf } as ConfState;
           for (const p of event.peers) await callPeer(p.id);
           break;
@@ -176,8 +189,10 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
             if (sdp.type === 'offer') {
               // Let our screen go out later through the video slot the caller opened.
               pc.getTransceivers().forEach((t) => {
-                if (t.receiver.track?.kind === 'video' && t.direction === 'recvonly') t.direction = 'sendrecv';
+                if (t.direction === 'recvonly') t.direction = 'sendrecv';
               });
+              // Someone joined while we show the screen: they get the screen, not the camera.
+              sendScreen(pc);
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
               signal(event.from, { sdp: pc.localDescription!.toJSON() });
@@ -273,34 +288,56 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   const stopScreen = useCallback(() => {
     screenTrack.current?.stop();
     screenTrack.current = null;
-    for (const pc of pcs.current.values()) videoSender(pc)?.replaceTrack(camTrack.current).catch(() => {});
+    screenAudioTrack.current?.stop();
+    screenAudioTrack.current = null;
+    for (const pc of pcs.current.values()) {
+      videoSender(pc)?.replaceTrack(camTrack.current).catch(() => {});
+      screenAudioSender(pc)?.replaceTrack(null).catch(() => {});
+    }
     const id = confRef.current?.info.id;
     if (id) sendSocket({ type: 'conf_screen', confId: id, on: false });
-    setConf((s) => (s ? { ...s, sharing: false, screen: null } : s));
+    setConf((s) => (s ? { ...s, sharing: false, screen: null, screenAudio: 'none' } : s));
   }, [sendSocket]);
 
   const toggleScreen = useCallback(async () => {
     if (screenTrack.current) return stopScreen();
     if (!canShareScreen) return fail('Демонстрация экрана работает в браузере на компьютере.');
     try {
-      const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      // Ask for the sound too: Chrome/Edge give it for a tab (tick «Поделиться звуком») and,
+      // on Windows, for the whole screen. Raw sound: no echo cancelling on a film.
+      const display = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        systemAudio: 'include',
+      } as DisplayMediaStreamOptions);
       const track = display.getVideoTracks()[0];
+      const sound = display.getAudioTracks()[0] ?? null;
       screenTrack.current = track;
+      screenAudioTrack.current = sound;
       track.onended = stopScreen; // «Прекратить показ» in the browser's own bar
-      for (const pc of pcs.current.values()) await videoSender(pc)?.replaceTrack(track).catch(() => {});
+      for (const pc of pcs.current.values()) sendScreen(pc);
       const id = confRef.current?.info.id;
       if (id) sendSocket({ type: 'conf_screen', confId: id, on: true });
-      setConf((s) => (s ? { ...s, sharing: true, screen: display } : s));
+      // Our own preview shows the picture only: hearing the film twice is no fun.
+      setConf((s) => (s ? { ...s, sharing: true, screen: new MediaStream([track]), screenAudio: sound ? 'on' : 'none' } : s));
+      if (!sound) fail('Звук не передаётся: при выборе вкладки отметьте «Поделиться звуком» (Chrome, Edge).');
     } catch {
       // the person closed the picker
     }
   }, [stopScreen, fail, sendSocket]);
 
+  const toggleScreenAudio = useCallback(() => {
+    const t = screenAudioTrack.current;
+    if (!t) return fail('Звук не передаётся: начните показ заново и отметьте «Поделиться звуком».');
+    t.enabled = !t.enabled;
+    setConf((s) => (s ? { ...s, screenAudio: t.enabled ? 'on' : 'off' } : s));
+  }, [fail]);
+
   useEffect(() => () => cleanup(), [me.id, cleanup]);
 
   return (
     <ConfContext.Provider
-      value={{ conf, invite, joining, error, canShareScreen, start, join, dismissInvite, leave, toggleMute, toggleCamera, toggleScreen }}
+      value={{ conf, invite, joining, error, canShareScreen, start, join, dismissInvite, leave, toggleMute, toggleCamera, toggleScreen, toggleScreenAudio }}
     >
       {children}
     </ConfContext.Provider>

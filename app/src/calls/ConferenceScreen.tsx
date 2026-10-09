@@ -39,7 +39,7 @@ export function ConferenceScreen() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { me } = useMessenger();
-  const { conf, invite, joining, error, canShareScreen, join, dismissInvite, leave, toggleMute, toggleCamera, toggleScreen } = useConference();
+  const { conf, invite, joining, error, canShareScreen, join, dismissInvite, leave, toggleMute, toggleCamera, toggleScreen, toggleScreenAudio } = useConference();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!conf) return;
@@ -129,6 +129,14 @@ export function ConferenceScreen() {
           <RoundButton glyph={conf.cameraOff ? 'camOff' : 'cam'} label={conf.cameraOff ? 'Камера выкл.' : 'Камера'} onPress={toggleCamera} active={conf.cameraOff} />
         ) : null}
         {canShareScreen ? <RoundButton glyph="screen" label={conf.sharing ? 'Остановить показ' : 'Показать экран'} onPress={toggleScreen} active={conf.sharing} /> : null}
+        {conf.sharing ? (
+          <RoundButton
+            glyph={conf.screenAudio === 'on' ? 'sound' : 'soundOff'}
+            label={conf.screenAudio === 'on' ? 'Звук экрана' : 'Звук экрана выкл.'}
+            onPress={toggleScreenAudio}
+            active={conf.screenAudio !== 'on'}
+          />
+        ) : null}
         <RoundButton glyph="hangup" label="Выйти" tone="red" onPress={leave} />
       </View>
     </View>
