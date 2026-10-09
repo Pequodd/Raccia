@@ -60,6 +60,8 @@ echo "Node.js $("$NODE_BIN" -v)"
 say "4/7 Код Олега"
 id -u oleg >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin oleg
 mkdir -p "$DATA_DIR" && chown oleg:oleg "$DATA_DIR"
+# The code belongs to the «oleg» user and git refuses to touch it as root without this.
+git config --global --get-all safe.directory | grep -qx "$APP_DIR" || git config --global --add safe.directory "$APP_DIR"
 if [ -d "$APP_DIR/.git" ]; then
   git -C "$APP_DIR" fetch --depth 1 origin "$BRANCH"
   git -C "$APP_DIR" reset --hard "origin/$BRANCH"
