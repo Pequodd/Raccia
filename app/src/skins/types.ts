@@ -114,6 +114,7 @@ export type Skin = {
   logoChrome: readonly { offset: number; color: string }[]; // «ОЛЕГ» letters
   logoShadow: string;
   hero: 'ball' | 'player'; // what crowns the login screen
+  authPanel?: boolean; // login form sits on a solid panel (photo backgrounds: XP's Bliss)
   background: { kind: BackgroundKind; gradient: Gradient; line: string };
   avatars: Gradient[];
   authorColors: string[]; // names in group bubbles

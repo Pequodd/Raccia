@@ -99,6 +99,7 @@ export const xp: Skin = {
   ],
   logoShadow: '#0A3FAE',
   hero: 'ball',
+  authPanel: true,
   background: { kind: 'bliss', gradient: ['#2E6FE0', '#A8D0F5'], line: '#4E9A2A' },
   avatars: [
     ['#3A8CF7', '#0A50D8'],

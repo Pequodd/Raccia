@@ -108,12 +108,13 @@ export function AuthScreen({
               </View>
             </>
           )}
-          <Text style={styles.slogan}>{skin.copy.slogan}</Text>
+          <Text style={[styles.slogan, skin.authPanel && styles.sloganOnPhoto]}>{skin.copy.slogan}</Text>
           <Plastic colors={roles.promo.grad} radius={18} style={styles.promo} shadow="0 6px 16px rgba(124,194,30,0.45)">
             <Text style={styles.promoTitle}>{skin.copy.promise}</Text>
             <Text style={styles.promoProof}>{skin.copy.promiseProof}</Text>
           </Plastic>
 
+          <View style={skin.authPanel ? styles.panel : null}>
           <View style={styles.fields}>
             {mode === 'register' ? (
               <View>
@@ -209,6 +210,7 @@ export function AuthScreen({
           </Pressable>
 
           <Text style={styles.footer}>{skin.copy.footer}</Text>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -222,6 +224,17 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, shape }) => ({
   brand: { width: 100, height: 100, alignSelf: 'center', boxShadow: '0 7px 16px rgba(0,0,0,0.35)', borderRadius: 18 },
   logo: { alignItems: 'center', marginTop: 10 },
   slogan: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center', marginTop: 8 },
+  sloganOnPhoto: { color: '#FFFFFF', fontFamily: fonts.bodyBold, textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  panel: {
+    marginTop: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    boxShadow: '2px 4px 14px rgba(0,0,0,0.35)',
+  },
   fields: { gap: 12, marginTop: 22 },
   label: {
     fontFamily: fonts.mono,
