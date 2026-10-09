@@ -121,7 +121,7 @@ const useStyles = makeStyles(({ colors, fonts, chrome, frames }) => ({
   },
   playerBody: { flexDirection: 'row', gap: 10, padding: 10 },
   cover: { width: 150, height: 150, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden' },
-  coverImage: { position: 'absolute', width: 120, height: 120, left: 14, top: 18 },
+  coverImage: { position: 'absolute', width: 60, height: 60, left: 44, top: 46 },
   coverTime: { position: 'absolute', left: 6, top: 4, fontFamily: fonts.mono, fontSize: 10, color: colors.lcdText },
   playerRight: { flex: 1, gap: 8, minWidth: 0 },
   marquee: { height: 28, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden', justifyContent: 'center' },

@@ -219,7 +219,7 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, shape }) => ({
   root: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 26, justifyContent: 'center' },
   column: { width: '100%', maxWidth: 360, alignSelf: 'center', alignItems: 'stretch' },
-  brand: { width: 200, height: 200, alignSelf: 'center', boxShadow: '0 14px 30px rgba(0,0,0,0.35)', borderRadius: 36 },
+  brand: { width: 100, height: 100, alignSelf: 'center', boxShadow: '0 7px 16px rgba(0,0,0,0.35)', borderRadius: 18 },
   logo: { alignItems: 'center', marginTop: 10 },
   slogan: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center', marginTop: 8 },
   fields: { gap: 12, marginTop: 22 },
