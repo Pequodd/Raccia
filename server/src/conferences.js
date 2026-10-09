@@ -6,6 +6,8 @@
 import { randomBytes } from 'node:crypto';
 
 export const MAX_PARTICIPANTS = 8;
+// See calls.js: a blinking connection gets this long to say «conf_resume».
+const GRACE_MS = 15_000;
 const MAX_SIGNAL = 64 * 1024;
 
 // Events about being in a room go only to the connection someone joined from (another
@@ -112,6 +114,11 @@ export function createConferences(deps) {
       case 'conf_join':
         if (deps.isMember(conf.chatId, userId)) join(userId, conf, ws);
         break;
+      case 'conf_resume': {
+        const seat = conf.people.get(userId);
+        if (seat && !seat.ws) seat.ws = ws;
+        break;
+      }
       case 'conf_leave':
         // Only the device that is in the room can take its seat away.
         if (conf.people.get(userId)?.ws === ws) leave(userId);
@@ -137,7 +144,14 @@ export function createConferences(deps) {
   // The tab or phone they joined from disconnected: leave, so others don't wait for a ghost.
   // (Another open tab of the same person does not keep them in.)
   function onSocketClosed(userId, ws) {
-    if (confOf(userId)?.people.get(userId)?.ws === ws) leave(userId);
+    const conf = confOf(userId);
+    const seat = conf?.people.get(userId);
+    if (!seat || seat.ws !== ws) return;
+    seat.ws = null;
+    const timer = setTimeout(() => {
+      if (confOf(userId) === conf && conf.people.get(userId) === seat && !seat.ws) leave(userId);
+    }, deps.graceMs ?? GRACE_MS);
+    timer.unref?.();
   }
 
   // The chat is being deleted: everyone out, no card to update.

@@ -6,7 +6,8 @@ import { createServer } from '../src/app.js';
 
 let server, wss, base;
 before(async () => {
-  ({ server, wss } = createServer(openDb(':memory:'), { voteMs: 60_000, push: { send: async () => {} } }));
+  ({ server, wss } = createServer(openDb(':memory:'), {
+    graceMs: 100, voteMs: 60_000, push: { send: async () => {} } }));
   await new Promise((r) => server.listen(0, r));
   base = `http://localhost:${server.address().port}`;
 });

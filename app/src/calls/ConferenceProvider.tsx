@@ -46,7 +46,7 @@ const ConfContext = createContext<Conferences | null>(null);
 export const canShareScreen = callsSupported && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 
 export function ConferenceProvider({ children }: { children: ReactNode }) {
-  const { me, sendSocket, onConfEvent } = useMessenger();
+  const { me, sendSocket, onConfEvent, connected } = useMessenger();
   const calls = useCalls();
   const [conf, setConf] = useState<ConfState | null>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
@@ -261,6 +261,12 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     localRef.current = stream;
     sendSocket({ type: 'conf_join', confId });
   }, [getMedia, sendSocket]);
+
+  // Back after a blink of the connection: keep our seat.
+  useEffect(() => {
+    const id = confRef.current?.info.id;
+    if (connected && id) sendSocket({ type: 'conf_resume', confId: id });
+  }, [connected, sendSocket]);
 
   // Closing the tab mid-conference: leave properly.
   useEffect(() => {

@@ -53,7 +53,8 @@ function imageType(buf) {
 
 // uploadDir: where photos go (served at /media). push: options for createPush (tests swap the sender).
 // turn: { turnHost, turnSecret } for calls (coturn on the same machine; see deploy/install.sh).
-export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOptions, turn = {} } = {}) {
+// graceMs: how long a call/conference waits for a dropped connection to come back.
+export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOptions, turn = {}, graceMs = 15_000 } = {}) {
   const app = express();
   const push = createPush(db, pushOptions);
   const meetups = createMeetups(db);
@@ -746,6 +747,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
   };
   const calls = createCalls({
     send,
+    graceMs,
     isWatching,
     notify: (uid, payload) => push.notify(uid, payload),
     userCard: (id) => {
@@ -776,7 +778,8 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
 
   const conferences = createConferences({
     send,
-    sendWs: (ws, event) => ws?.readyState === ws?.OPEN && ws.send(JSON.stringify(event)),
+    sendWs: (ws, event) => ws && ws.readyState === ws.OPEN && ws.send(JSON.stringify(event)),
+    graceMs,
     isWatching,
     notify: (uid, payload) => push.notify(uid, payload),
     memberIds,

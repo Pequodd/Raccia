@@ -6,6 +6,9 @@ import { createHmac, randomBytes } from 'node:crypto';
 // when phones sit behind strict NATs.
 
 const RING_MS = 40_000;
+// A phone's connection blinks (permission prompt, Wi-Fi ↔ mobile): the app reconnects and
+// says «call_resume». Only if it doesn't come back in this time is the call over.
+const GRACE_MS = 15_000;
 const MAX_SIGNAL = 64 * 1024;
 
 export function formatCallDuration(ms) {
@@ -98,6 +101,11 @@ export function createCalls(deps) {
       case 'call_hangup':
         end(call, call.answeredAt ? 'ended' : userId === call.from ? 'canceled' : 'declined');
         break;
+      case 'call_resume':
+        // Back after a blink: this connection now stands for this side of the call.
+        if (userId === call.from) call.fromWs = ws;
+        else if (call.answeredAt) call.toWs = ws;
+        break;
       case 'call_failed':
         end(call, 'failed');
         break;
@@ -114,9 +122,13 @@ export function createCalls(deps) {
   function onSocketClosed(userId, ws) {
     const call = calls.get(byUser.get(userId));
     if (!call) return;
-    if ((call.from === userId && call.fromWs === ws) || (call.to === userId && call.toWs === ws)) {
-      end(call, call.answeredAt ? 'failed' : 'canceled');
-    }
+    const side = call.from === userId && call.fromWs === ws ? 'fromWs' : call.to === userId && call.toWs === ws ? 'toWs' : null;
+    if (!side) return;
+    call[side] = null;
+    const timer = setTimeout(() => {
+      if (calls.get(call.id) === call && !call[side]) end(call, call.answeredAt ? 'failed' : 'canceled');
+    }, deps.graceMs ?? GRACE_MS);
+    timer.unref?.();
   }
 
   // Someone (re)connected while their phone is ringing: show the call again.

@@ -8,6 +8,7 @@ let server, wss, base;
 const pushed = [];
 before(async () => {
   ({ server, wss } = createServer(openDb(':memory:'), {
+    graceMs: 1000, // long enough for the reconnect test, short for the rest
     voteMs: 60_000,
     push: { send: async (_sub, data) => pushed.push(JSON.parse(data)) },
     turn: { turnHost: 'oleg.test', turnSecret: 'sekret' },
@@ -104,6 +105,35 @@ test('calls: ring, accept, relay signals, hang up, log in chat', async () => {
   A.send({ type: 'call_invite', chatId: group, video: false });
   assert.match((await A.next('call_error')).error, /личном/);
 
+  A.ws.close();
+  B.ws.close();
+});
+
+test('a call survives the connection blinking (reconnect + call_resume)', async () => {
+  const a = await api('/api/login', null, { username: 'anya', password: 'secret1' });
+  const b = await api('/api/login', null, { username: 'boris', password: 'secret1' });
+  const chatId = (await api('/api/chats', a.token)).chats.find((c) => c.type === 'direct').id;
+  const A = connect(a.token);
+  let B = connect(b.token);
+  await Promise.all([A.open, B.open]);
+  A.send({ type: 'call_invite', chatId, video: false });
+  const callId = (await B.next('call_incoming')).call.id;
+  B.send({ type: 'call_accept', callId });
+  await A.next('call_accepted');
+
+  // Boris's phone drops the connection and comes back a moment later.
+  B.ws.close();
+  await new Promise((r) => setTimeout(r, 200));
+  B = connect(b.token);
+  await B.open;
+  B.send({ type: 'call_resume', callId });
+  await new Promise((r) => setTimeout(r, 200));
+
+  // Still on: signals pass, and hanging up ends it normally.
+  A.send({ type: 'call_signal', callId, data: { candidate: { candidate: 'y' } } });
+  assert.equal((await B.next('call_signal')).data.candidate.candidate, 'y');
+  A.send({ type: 'call_hangup', callId });
+  assert.equal((await B.next('call_ended')).outcome, 'ended');
   A.ws.close();
   B.ws.close();
 });

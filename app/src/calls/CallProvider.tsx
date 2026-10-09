@@ -67,7 +67,7 @@ function mediaError(e: unknown) {
 }
 
 export function CallProvider({ children }: { children: ReactNode }) {
-  const { me, sendSocket, onCallEvent } = useMessenger();
+  const { me, sendSocket, onCallEvent, connected } = useMessenger();
   const [call, setCall] = useState<CallState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const callRef = useRef<CallState | null>(null);
@@ -237,6 +237,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
     });
   }, [onCallEvent, patch, connect, signal, flushIce, cleanup, say, sendSocket]);
+
+  // The connection to the server blinked and came back: «still here», or the server ends the call.
+  useEffect(() => {
+    const c = callRef.current;
+    if (connected && c?.info && c.status !== 'incoming') sendSocket({ type: 'call_resume', callId: c.info.id });
+  }, [connected, sendSocket]);
 
   // Leaving the page mid-call: tell the other side instead of leaving them hanging.
   useEffect(() => {
