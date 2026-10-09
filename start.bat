@@ -5,7 +5,13 @@ cd /d "%~dp0"
 
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Нужен Node.js версии 22 или новее: https://nodejs.org — установите LTS и запустите снова.
+  echo Нужен Node.js версии 22.13 или новее: https://nodejs.org — установите LTS и запустите снова.
+  pause
+  exit /b 1
+)
+node -e "const [a,b]=process.versions.node.split('.').map(Number); process.exit(a>22||(a===22&&b>=13)?0:1)"
+if errorlevel 1 (
+  echo Node.js слишком старый, нужен 22.13 или новее: https://nodejs.org — установите LTS и запустите снова.
   pause
   exit /b 1
 )
@@ -19,6 +25,7 @@ call npm install --no-audit --no-fund || goto :fail
 popd
 
 echo == Запускаю сервер Олега в отдельном окне: http://localhost:3000
+echo    Если в том окне ошибка - пришлите её текст.
 start "Oleg server" cmd /k "cd /d ""%~dp0server"" && npm start"
 
 echo == Открываю Олега в браузере: http://localhost:8081

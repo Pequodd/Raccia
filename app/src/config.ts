@@ -13,6 +13,10 @@ function resolveApiUrl(): string {
     return `http://${hostUri.split(':')[0]}:3000`;
   }
   if (Platform.OS === 'android') return 'http://10.0.2.2:3000';
+  // Web: the server runs on the same machine as the page, whatever address it was opened by.
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname) {
+    return `http://${window.location.hostname}:3000`;
+  }
   return 'http://localhost:3000';
 }
 
