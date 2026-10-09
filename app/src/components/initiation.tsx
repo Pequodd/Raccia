@@ -192,7 +192,7 @@ export function InviteCard({ onClose }: { onClose: () => void }) {
 
   async function share() {
     if (!link) return;
-    const message = `Подключайся к Олегу — НеМногонациональному мессенджеру: ${link}`;
+    const message = `Подключайся к Олегу — Ненациональному мессенджеру: ${link}`;
     if (Platform.OS === 'web') {
       const nav = globalThis.navigator as Navigator | undefined;
       if (nav?.share) await nav.share({ text: message }).catch(() => {});

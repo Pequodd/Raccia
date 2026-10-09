@@ -12,6 +12,8 @@ const { openDb } = await import('./db.js');
 const { createServer } = await import('./app.js');
 
 const PORT = Number(process.env.PORT) || 3000;
+// HOST=127.0.0.1 keeps the server behind a reverse proxy (Caddy) on a VPS.
+const HOST = process.env.HOST || undefined;
 // fileURLToPath gives a proper path on Windows too (URL.pathname would be "/C:/…").
 const DB_FILE = process.env.DB_FILE || fileURLToPath(new URL('../data/oleg.db', import.meta.url));
 
@@ -40,7 +42,7 @@ function onListenError(err) {
 server.on('error', onListenError);
 wss.on('error', onListenError);
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   console.log(`Oleg server: http://localhost:${PORT}`);
   if (existsSync(WEB_DIR)) console.log(`Web version: http://localhost:${PORT}/`);
 });

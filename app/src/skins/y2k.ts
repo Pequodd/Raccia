@@ -89,7 +89,7 @@ export const y2k: Skin = {
     mono: 'PTMono_400Regular',
   },
   copy: {
-    slogan: 'НеМногонациональный мессенджер Олег',
+    slogan: 'Ненациональный мессенджер Олег',
     promise: 'БЕЗ ЦЕНЗУРЫ\nИ БЛОКИРОВОК РКН!',
     promiseProof: '✓ Сервис расположен на серверах Сбера',
     loginButton: 'Погнали в 2000!',
