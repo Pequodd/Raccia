@@ -9,6 +9,7 @@ import { createPush } from './push.js';
 import { MediaError, saveMedia } from './media.js';
 import { createMeetups, MeetupError } from './meetups.js';
 import { createCalls, formatCallDuration, iceServers } from './calls.js';
+import { createConferences } from './conferences.js';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 const MAX_MESSAGE_LENGTH = 4000;
@@ -18,7 +19,7 @@ const MAX_BIO_LENGTH = 140;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 const MAX_CAPTION_LENGTH = 1000;
 // How an attachment reads in a push and in the chat list.
-export const MEDIA_LABELS = { call: '📞 Звонок', image: '📷 Фото', video: '🎬 Видео', voice: '🎤 Голосовое', circle: '⭕ Кружок', meetup: '🍺 Сходка' };
+export const MEDIA_LABELS = { conference: '📹 Конференция', call: '📞 Звонок', image: '📷 Фото', video: '🎬 Видео', voice: '🎤 Голосовое', circle: '⭕ Кружок', meetup: '🍺 Сходка' };
 // Meetup times are written for people in Chelyabinsk (UTC+5) unless OLEG_TZ says otherwise.
 const TIME_ZONE = process.env.OLEG_TZ || 'Asia/Yekaterinburg';
 const meetupTime = (ts) =>
@@ -88,6 +89,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     setOnboarded: db.prepare('UPDATE users SET onboarded = 1 WHERE id = ?'),
     invitedCount: db.prepare('SELECT COUNT(*) AS n FROM users WHERE invited_by = ?'),
     chatInfo: db.prepare('SELECT type, title FROM chats WHERE id = ?'),
+    setMedia: db.prepare('UPDATE messages SET media = ? WHERE id = ?'),
     initiatedIds: db.prepare("SELECT id FROM users WHERE status = 'initiated'"),
     allIds: db.prepare('SELECT id FROM users'),
     candidates: db.prepare("SELECT id FROM users WHERE status = 'candidate'"),
@@ -209,6 +211,19 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
 
   function messageView(row) {
     const media = row.media ? JSON.parse(row.media) : null;
+    if (row.kind === 'conference' && media?.confId) {
+      return {
+        id: row.id,
+        chatId: row.chat_id,
+        userId: row.user_id,
+        kind: row.kind,
+        media: null,
+        conference: conferences.live(media.confId) ?? { id: media.confId, active: false, video: media.video, startedAt: row.created_at, duration: media.duration ?? 0, people: [] },
+        name: row.name,
+        body: row.body,
+        createdAt: row.created_at,
+      };
+    }
     if (row.kind === 'meetup' && media?.meetupId) {
       const nameOf = (id) => q.userById.get(id)?.name ?? '?';
       return {
@@ -748,6 +763,41 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     },
   });
 
+  // Conference cards change as people come and go; everyone in the chat sees it live.
+  function refreshMessage(messageId) {
+    const row = messageId && q.messageById.get(messageId);
+    if (!row) return;
+    const message = messageView(row);
+    for (const uid of memberIds(row.chat_id)) send(uid, { type: 'message_update', chatId: row.chat_id, message });
+  }
+
+  const conferences = createConferences({
+    send,
+    isWatching,
+    notify: (uid, payload) => push.notify(uid, payload),
+    memberIds,
+    isMember: (chatId, userId) => Boolean(q.isMember.get(chatId, userId)),
+    userCard: (id) => {
+      const u = userView(q.userById.get(id));
+      return { id: u.id, name: u.name, avatar: u.avatar };
+    },
+    chatTitle: (chatId, viewerId) => {
+      const chat = q.chatInfo.get(chatId);
+      if (chat?.type === 'group') return chat.title;
+      const other = memberIds(chatId).find((id) => id !== viewerId);
+      return other ? q.userById.get(other).name : 'Конференция';
+    },
+    postConference: (chatId, userId, conf) =>
+      postMessage(chatId, userId, conf.video ? 'Видеоконференция' : 'Аудиоконференция', 'conference', { confId: conf.id, video: conf.video }).id,
+    refreshCard: (conf) => refreshMessage(conf.messageId),
+    finishCard: (conf) => {
+      if (!conf.messageId) return;
+      const duration = Date.now() - conf.startedAt;
+      q.setMedia.run(JSON.stringify({ confId: conf.id, video: conf.video, duration }), conf.messageId);
+      refreshMessage(conf.messageId);
+    },
+  });
+
   app.get('/api/turn', requireAuth, (req, res) => res.json({ iceServers: iceServers(req.user.id, turn) }));
 
   // --- Сходка ---
@@ -863,6 +913,10 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       } catch {
         return;
       }
+      if (typeof msg?.type === 'string' && msg.type.startsWith('conf_')) {
+        conferences.handle(user.id, msg);
+        return;
+      }
       if (typeof msg?.type === 'string' && msg.type.startsWith('call_')) {
         calls.handle(user.id, msg);
         return;
@@ -886,6 +940,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       set?.delete(ws);
       if (set && set.size === 0) {
         sockets.delete(user.id);
+        conferences.onOffline(user.id);
         for (const id of contactsOf(user.id)) send(id, { type: 'presence', userId: user.id, online: false });
       }
     });

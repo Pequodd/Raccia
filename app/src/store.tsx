@@ -3,7 +3,7 @@ import { AppState, Platform } from 'react-native';
 import { api } from './api';
 import { Socket } from './socket';
 import { uploadMedia } from './media/upload';
-import type { CallEvent, Chat, MediaDraft, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
+import type { CallEvent, ConfEvent, Chat, MediaDraft, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
 
 type ChatMessages = { items: Message[]; hasMore: boolean; loaded: boolean };
 
@@ -225,6 +225,7 @@ type Messenger = State & {
   // Calls: raw socket messages out, call events in (see src/calls).
   sendSocket: (data: object) => void;
   onCallEvent: (listener: (event: CallEvent) => void) => () => void;
+  onConfEvent: (listener: (event: ConfEvent) => void) => () => void;
   retryMessage: (item: PendingMessage) => void;
   markRead: (chatId: number) => void;
   notifyTyping: (chatId: number) => void;
@@ -251,6 +252,7 @@ export function MessengerProvider({
   const [me, setMe] = useState(initialMe);
   const [incoming, setIncoming] = useState<Incoming | null>(null);
   const callListeners = useRef(new Set<(event: CallEvent) => void>());
+  const confListeners = useRef(new Set<(event: ConfEvent) => void>());
   const socketRef = useRef<Socket | null>(null);
   const activeRef = useRef(activeChatId);
   activeRef.current = activeChatId;
@@ -282,6 +284,10 @@ export function MessengerProvider({
     const onEvent = (event: ServerEvent) => {
       if (event.type.startsWith('call_')) {
         for (const l of callListeners.current) l(event as CallEvent);
+        return;
+      }
+      if (event.type.startsWith('conf_')) {
+        for (const l of confListeners.current) l(event as ConfEvent);
         return;
       }
       switch (event.type) {
@@ -334,6 +340,7 @@ export function MessengerProvider({
           dispatch({ type: 'presence', userId: event.userId, online: event.online });
           break;
         case 'meetup':
+        case 'message_update':
           dispatch({ type: 'replaceMessage', message: event.message });
           break;
       }
@@ -374,6 +381,12 @@ export function MessengerProvider({
     callListeners.current.add(listener);
     return () => {
       callListeners.current.delete(listener);
+    };
+  }, []);
+  const onConfEvent = useCallback((listener: (event: ConfEvent) => void) => {
+    confListeners.current.add(listener);
+    return () => {
+      confListeners.current.delete(listener);
     };
   }, []);
 
@@ -483,13 +496,14 @@ export function MessengerProvider({
       replaceMessage,
       sendSocket,
       onCallEvent,
+      onConfEvent,
       retryMessage: deliver,
       markRead,
       notifyTyping,
       openDirect,
       createGroup,
     }),
-    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, sendMedia, replaceMessage, sendSocket, onCallEvent, deliver, markRead, notifyTyping, openDirect, createGroup]
+    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, sendMedia, replaceMessage, sendSocket, onCallEvent, onConfEvent, deliver, markRead, notifyTyping, openDirect, createGroup]
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

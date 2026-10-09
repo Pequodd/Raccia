@@ -20,6 +20,20 @@ export type Member = User & { online: boolean; lastReadId: number; lastDelivered
 export type MediaKind = 'image' | 'video' | 'voice' | 'circle';
 export const MEDIA_KINDS: readonly string[] = ['image', 'video', 'voice', 'circle'];
 
+// --- Conferences (a whole chat, mesh WebRTC, screen sharing) ---
+export type ConfPerson = CallPeer & { screen: boolean };
+export type Conference = { id: string; active: boolean; video: boolean; startedAt: number; duration?: number; people: ConfPerson[] };
+export type ConfInfo = { id: string; chatId: number; video: boolean; title: string };
+export type ConfEvent =
+  | { type: 'conf_joined'; conf: ConfInfo; peers: ConfPerson[] }
+  | { type: 'conf_invite'; conf: ConfInfo & { host: CallPeer } }
+  | { type: 'conf_peer_joined'; confId: string; peer: ConfPerson }
+  | { type: 'conf_peer_left'; confId: string; userId: number }
+  | { type: 'conf_signal'; confId: string; from: number; data: CallSignal }
+  | { type: 'conf_screen'; confId: string; userId: number; on: boolean }
+  | { type: 'conf_left'; confId: string }
+  | { type: 'conf_error'; error: string };
+
 // --- Calls (1:1, in direct chats) ---
 export type CallPeer = { id: number; name: string; avatar: string | null };
 export type CallInfo = { id: string; chatId: number; video: boolean; from: CallPeer; to: CallPeer };
@@ -55,10 +69,11 @@ export type Message = {
   id: number;
   chatId: number;
   userId: number;
-  kind: 'text' | 'service' | 'meetup' | 'call' | MediaKind;
+  kind: 'text' | 'service' | 'meetup' | 'call' | 'conference' | MediaKind;
   media: Media | null;
   meetup?: Meetup | null;
   forwardedFrom?: string | null; // «Переслано от …»
+  conference?: Conference | null;
   name: string;
   body: string; // text, or the caption of an attachment
   createdAt: number;
@@ -111,7 +126,9 @@ export type ServerEvent =
   | { type: 'typing'; chatId: number; userId: number; name: string }
   | { type: 'presence'; userId: number; online: boolean }
   | { type: 'meetup'; chatId: number; message: Message }
+  | { type: 'message_update'; chatId: number; message: Message }
   | CallEvent
+  | ConfEvent
   | { type: 'vote'; vote: Vote }
   | { type: 'vote_closed'; candidateId: number }
   | ({ type: 'vote_result' } & VoteResult);

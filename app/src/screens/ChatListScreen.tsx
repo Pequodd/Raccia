@@ -8,6 +8,7 @@ import { makeStyles, radius, useSkin } from '../skins';
 import { useState } from 'react';
 import { messagePreview } from '../media/upload';
 import { useParts } from '../parts';
+import { ConferenceSheet } from '../calls/ConferenceScreen';
 import { useMessenger } from '../store';
 import type { Chat } from '../types';
 import { diagonal, formatTime } from '../y2k';
@@ -60,6 +61,7 @@ export function ChatListScreen({
   const { chats, me, connected, activeChatId, setActiveChat, typing, votes, results } = useMessenger();
   const visible = filterChats(chats, query);
   const [inviting, setInviting] = useState(false);
+  const [conferencing, setConferencing] = useState(false);
   const otherVotes = Object.values(votes).filter((v) => v.candidate.id !== me.id);
   const parts = useParts();
 
@@ -138,6 +140,7 @@ export function ChatListScreen({
 
   return (
     <View style={styles.root}>
+      <ConferenceSheet visible={conferencing} onClose={() => setConferencing(false)} />
       {wide ? null : parts.ListHeader ? (
         <parts.ListHeader
           myName={me.name}
@@ -188,6 +191,9 @@ export function ChatListScreen({
               </Plastic>
               <Plastic colors={roles.chipGroup.grad} style={styles.chip} onPress={() => onNewChat('group')} accessibilityLabel="Тусовка">
                 <Text style={[styles.chipText, { color: roles.chipGroup.text }]}>{skin.copy.newGroup}</Text>
+              </Plastic>
+              <Plastic colors={roles.chipNew.grad} style={styles.chip} onPress={() => setConferencing(true)} accessibilityLabel="Конференция">
+                <Text style={[styles.chipText, { color: roles.chipNew.text }]}>📹 Конференция</Text>
               </Plastic>
             </View>
             {inviting ? <InviteCard onClose={() => setInviting(false)} /> : null}

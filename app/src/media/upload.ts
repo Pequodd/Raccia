@@ -5,6 +5,7 @@ import type { MediaDraft, Message } from '../types';
 // One line for a message in the chat list and the banner: «📷 Фото · подпись», «📞 Пропущенный звонок».
 export function messagePreview(m: Pick<Message, 'kind' | 'body'>) {
   if (m.kind === 'call') return `📞 ${m.body}`;
+  if (m.kind === 'conference') return `📹 ${m.body}`;
   const label = m.kind in MEDIA_LABELS ? MEDIA_LABELS[m.kind as keyof typeof MEDIA_LABELS] : null;
   return label ? (m.body ? `${label} · ${m.body}` : label) : m.body;
 }

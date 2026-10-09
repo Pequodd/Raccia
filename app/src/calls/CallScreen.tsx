@@ -8,7 +8,7 @@ import { makeStyles } from '../skins';
 import { useCalls, type CallState } from './CallProvider';
 
 // A <video>/<audio> element fed by a MediaStream (web only).
-function StreamView({ stream, kind, mirrored, muted, style }: { stream: MediaStream | null; kind: 'video' | 'audio'; mirrored?: boolean; muted?: boolean; style?: object }) {
+export function StreamView({ stream, kind, mirrored, muted, style }: { stream: MediaStream | null; kind: 'video' | 'audio'; mirrored?: boolean; muted?: boolean; style?: object }) {
   if (Platform.OS !== 'web' || !stream) return null;
   return createElement(kind, {
     ref: (el: HTMLMediaElement | null) => {
@@ -24,7 +24,7 @@ function StreamView({ stream, kind, mirrored, muted, style }: { stream: MediaStr
   });
 }
 
-type Glyph = 'phone' | 'hangup' | 'mic' | 'micOff' | 'cam' | 'camOff' | 'flip';
+export type Glyph = 'phone' | 'hangup' | 'mic' | 'micOff' | 'cam' | 'camOff' | 'flip' | 'screen';
 const GLYPHS: Record<Glyph, string> = {
   phone: 'M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z',
   hangup: 'M12 9c-1.6 0-3.15.25-4.6.72v3.1a1 1 0 0 1-.56.9 11.5 11.5 0 0 0-2.66 1.85 1 1 0 0 1-1.41 0L.29 13.1a1 1 0 0 1 0-1.41A16.9 16.9 0 0 1 12 7c4.6 0 8.75 1.83 11.7 4.7a1 1 0 0 1 0 1.4l-2.48 2.48a1 1 0 0 1-1.41 0 11.3 11.3 0 0 0-2.67-1.85 1 1 0 0 1-.56-.9v-3.1A15 15 0 0 0 12 9z',
@@ -32,10 +32,11 @@ const GLYPHS: Record<Glyph, string> = {
   micOff: 'M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23A6.9 6.9 0 0 0 19 11zm-4.02.17L9 5.18V5a3 3 0 0 1 6 0v6zM4.27 3 3 4.27l6 6V11a3 3 0 0 0 4.06 2.8l1.66 1.66A5.3 5.3 0 0 1 6.7 11H5a7 7 0 0 0 6 6.92V21h2v-3.08a6.9 6.9 0 0 0 2.54-.9L19.73 21 21 19.73z',
   cam: 'M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z',
   camOff: 'M21 6.5l-4 4V7a1 1 0 0 0-1-1H9.82L21 17.18zM3.27 2 2 3.27 4.73 6H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12c.21 0 .39-.08.55-.18L19.73 21 21 19.73z',
+  screen: 'M20 3H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h6v2H8v2h8v-2h-2v-2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 13H4V5h16zM11 7.5V10H8v2h3v2.5l3.5-3.5z',
   flip: 'M20 5h-3.2L15 3H9L7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-5 11.5V14H9v2.5L5.5 13 9 9.5V12h6V9.5l3.5 3.5z',
 };
 
-function RoundButton({ glyph, label, onPress, tone = 'dim', active }: { glyph: Glyph; label: string; onPress: () => void; tone?: 'dim' | 'red' | 'green'; active?: boolean }) {
+export function RoundButton({ glyph, label, onPress, tone = 'dim', active }: { glyph: Glyph; label: string; onPress: () => void; tone?: 'dim' | 'red' | 'green'; active?: boolean }) {
   const styles = useStyles();
   const bg = tone === 'red' ? '#E5393B' : tone === 'green' ? '#2FBF4F' : active ? '#FFFFFF' : 'rgba(255,255,255,0.18)';
   const fg = tone === 'dim' && active ? '#141220' : '#FFFFFF';

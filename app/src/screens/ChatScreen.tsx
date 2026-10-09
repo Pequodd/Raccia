@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ForwardSheet, MessageActions } from '../components/forward';
 import { MeetupCard, MeetupSheet } from '../components/meetup';
 import { useCalls } from '../calls/CallProvider';
+import { useConference } from '../calls/ConferenceProvider';
 import { CallButtons } from '../calls/CallButtons';
 import { UserCard } from '../components/profile';
 import { CircleRecorder } from '../media/CircleRecorder';
@@ -24,6 +25,7 @@ import { AttachPreview, AttachSheet, RecordingBar, ToolButton } from '../media/C
 import { MediaContent, type MediaView } from '../media/MediaViews';
 import { draftFromFile, pickAttachment, PickError } from '../media/pick';
 import { mediaUrl } from '../media/upload';
+import { formatDuration } from '../media/circleUi';
 import { useVoiceRecorder } from '../media/useVoiceRecorder';
 import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../components/y2k';
 import { makeStyles, radius, useSkin } from '../skins';
@@ -56,6 +58,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const parts = useParts();
   const [profileId, setProfileId] = useState<number | null>(null);
   const calls = useCalls();
+  const conference = useConference();
   const [attaching, setAttaching] = useState(false);
   const [draft, setDraft] = useState<MediaDraft | null>(null);
   const [circling, setCircling] = useState(false);
@@ -123,7 +126,12 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
   const other = chat.type === 'direct' ? others[0] : undefined;
   const openProfile = other ? () => setProfileId(other.id) : undefined;
-  const startCall = other ? (video: boolean) => calls.start(chatId, video, { name: chat.title, avatar: other.avatar }) : undefined;
+  // Direct chat: a call. Group: a conference for everyone in it.
+  const startCall = other
+    ? (video: boolean) => calls.start(chatId, video, { name: chat.title, avatar: other.avatar })
+    : chat.type === 'group'
+      ? (video: boolean) => conference.start(chatId, video)
+      : undefined;
   let subtitle: string;
   if (t) subtitle = chat.type === 'group' ? `${t.name} ${skin.copy.typing}` : skin.copy.typing;
   else if (chat.type === 'group') {
@@ -249,6 +257,28 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       case 'message': {
         const m = item.message;
         const mine = m.userId === me.id;
+        if (m.kind === 'conference' && m.conference) {
+          const c = m.conference;
+          return (
+            <View style={styles.serviceRow}>
+              <View style={[styles.confCard, c.active && styles.confCardLive]}>
+                <Text style={styles.confTitle}>
+                  {c.video ? '📹' : '🎧'} {m.body} · {c.active ? 'идёт' : 'завершилась'}
+                </Text>
+                <Text style={styles.confSub} numberOfLines={2}>
+                  {c.active
+                    ? `${c.people.map((p) => p.name).join(', ')}${c.people.some((p) => p.screen) ? ' · показывают экран' : ''}`
+                    : `${m.name} · ${clockTime(m.createdAt)} · ${formatDuration(c.duration ?? 0)}`}
+                </Text>
+                {c.active && conference.conf?.info.id !== c.id ? (
+                  <Plastic colors={roles.positive.grad} style={styles.confJoin} onPress={() => conference.join(c.id, c.video)} accessibilityLabel="Присоединиться">
+                    <Text style={[styles.confJoinText, { color: roles.positive.text }]}>Присоединиться</Text>
+                  </Plastic>
+                ) : null}
+              </View>
+            </View>
+          );
+        }
         if (m.kind === 'call') {
           const missed = m.media && 'outcome' in m.media && (m.media as { outcome?: string }).outcome !== 'ended';
           const video = !!(m.media as { video?: boolean } | null)?.video;
@@ -575,6 +605,12 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   bubbleRow: { flexDirection: 'row', flexShrink: 0 },
   bubbleMedia: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 5 },
   captionPad: { paddingHorizontal: 8 },
+  confCard: { width: '86%', maxWidth: 380, gap: 6, padding: 12, borderRadius: 16, backgroundColor: colors.serviceBg, alignItems: 'center' },
+  confCardLive: { borderWidth: 2, borderColor: colors.neon },
+  confTitle: { fontFamily: fonts.bodyHeavy, fontSize: 15, color: colors.serviceText, textAlign: 'center' },
+  confSub: { fontFamily: fonts.body, fontSize: 13, color: colors.serviceText, textAlign: 'center' },
+  confJoin: { height: 40, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  confJoinText: { fontFamily: fonts.bodyHeavy, fontSize: 15 },
   callPill: { maxWidth: '86%', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.serviceBg },
   callPillMissed: { backgroundColor: colors.dangerBg },
   callPillText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.serviceText, textAlign: 'center' },

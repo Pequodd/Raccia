@@ -13,6 +13,8 @@ import { ProfileScreen, SettingsScreen } from './src/screens/AccountScreens';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { CallProvider } from './src/calls/CallProvider';
 import { CallScreen } from './src/calls/CallScreen';
+import { ConferenceProvider } from './src/calls/ConferenceProvider';
+import { ConferenceScreen } from './src/calls/ConferenceScreen';
 import { InAppBanner, InstallSheet } from './src/components/notify';
 import { chatFromUrl, disablePush, onOpenFromNotification, registerServiceWorker, resubscribe, setUnreadBadge } from './src/push';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -161,7 +163,9 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
   return (
     <MessengerProvider me={session.user} token={session.token} activeChatId={activeChatId} setActiveChat={setActiveChat}>
       <CallProvider>
-        <Shell onLogout={onLogout} openTick={openTick} />
+        <ConferenceProvider>
+          <Shell onLogout={onLogout} openTick={openTick} />
+        </ConferenceProvider>
       </CallProvider>
     </MessengerProvider>
   );
@@ -176,6 +180,7 @@ function Shell({ onLogout, openTick }: { onLogout: () => void; openTick: number 
       <ShellBody onLogout={onLogout} openTick={openTick} />
       <InAppBanner />
       <CallScreen />
+      <ConferenceScreen />
     </View>
   );
 }
