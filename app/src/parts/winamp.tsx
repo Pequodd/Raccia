@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { TitleStrip } from '../components/heroes';
-import { stickerImages, stickers } from '../components/y2k';
+import { avatarSource, stickers } from '../components/y2k';
 import type { ChatHeaderProps, ChatRowProps, ComposerProps, ListHeaderProps, Parts, TabItem } from './index';
 
 // Winamp skin, laid out from docs/design/retro/oleg-winamp.dc.html (W07, W09).
@@ -38,7 +38,8 @@ const amberButton = bevel('#FFE29A', '#7A4A00');
 
 // Square tile with a letter (or a sticker), as in the playlist.
 function Tile({ name, avatar, size, color, online, gold }: { name: string; avatar: string | null; size: number; color?: string; online?: boolean; gold?: boolean }) {
-  const image = avatar ? stickerImages[avatar] : undefined;
+  const source = avatarSource(avatar);
+  const image = source?.image;
   return (
     <View
       style={[
@@ -50,7 +51,11 @@ function Tile({ name, avatar, size, color, online, gold }: { name: string; avata
     >
       {image ? (
         <View style={{ position: 'absolute', inset: 0, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <Image source={image} style={{ width: size + 6, height: size + 6, marginBottom: -4 }} contentFit="contain" />
+          {source?.photo ? (
+            <Image source={image} style={{ width: size, height: size }} contentFit="cover" />
+          ) : (
+            <Image source={image} style={{ width: size + 6, height: size + 6, marginBottom: -4 }} contentFit="contain" />
+          )}
         </View>
       ) : (
         <Text style={{ fontFamily: F.display, fontSize: size * 0.42, color: gold ? '#2A2000' : '#14151B' }}>
@@ -124,7 +129,7 @@ function ChatRow({ index, title, preview, typing, time, unread, isNew, online, a
   );
 }
 
-function ChatHeader({ title, subtitle, avatar, online, onBack, wide, topInset }: ChatHeaderProps) {
+function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, wide, topInset }: ChatHeaderProps) {
   return (
     <View style={[s.header, { paddingTop: wide ? 0 : topInset }]}>
       <LinearGradient colors={['#454A5C', '#2C2F3B']} style={StyleSheet.absoluteFill} />
@@ -135,15 +140,17 @@ function ChatHeader({ title, subtitle, avatar, online, onBack, wide, topInset }:
             <Text style={s.squareGlyph}>‹</Text>
           </Pressable>
         ) : null}
-        <View style={s.titleLcd}>
+        <Pressable onPress={onOpenProfile} disabled={!onOpenProfile} style={s.titleLcd} accessibilityLabel={onOpenProfile ? `Профиль: ${title}` : undefined}>
           <Text numberOfLines={1} style={s.titleLcdName}>
             {title}
           </Text>
           <Text numberOfLines={1} style={s.titleLcdSub}>
             {subtitle}
           </Text>
-        </View>
-        <Tile name={title} avatar={avatar} size={38} gold online={online} />
+        </Pressable>
+        <Pressable onPress={onOpenProfile} disabled={!onOpenProfile}>
+          <Tile name={title} avatar={avatar} size={38} gold online={online} />
+        </Pressable>
       </View>
     </View>
   );

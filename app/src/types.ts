@@ -4,12 +4,16 @@ export type User = {
   id: number;
   username: string; // login nick
   name: string; // shown name: «Олег#N» until initiated
-  avatar: string | null; // sticker id
+  avatar: string | null; // sticker id, or «photo:<file>» for an uploaded photo
+  bio: string | null; // «о себе», initiated only
   status: UserStatus;
   online?: boolean;
 };
 
-export type Me = User & { isAdmin: boolean };
+// The card on the profile screen.
+export type Profile = User & { joinedAt: number; invitedBy: User | null; invitedCount: number };
+
+export type Me = Profile & { isAdmin: boolean; onboarded: boolean; push: boolean; photo: string | null };
 
 export type Member = User & { online: boolean; lastReadId: number; lastDeliveredId: number };
 

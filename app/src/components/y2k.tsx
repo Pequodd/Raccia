@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, Line, LinearGradient as SvgGradient, Path, Pattern, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { avatarGradient, avatarTextColor, diagonal, initials } from '../y2k';
+import { API_URL } from '../config';
 import { makeStyles, radius, useSkin } from '../skins';
 
 // The Oleg sticker pack; the same ids serve as avatars (server: AVATARS).
@@ -24,6 +25,14 @@ export const stickerImages: Record<string, number> = {
   work: require('../../assets/stickers/webp/work.webp'),
   away: require('../../assets/stickers/webp/away.webp'),
 };
+
+// What to draw for an avatar value: a sticker from the pack or an uploaded photo.
+export function avatarSource(avatar: string | null | undefined): { image: number | { uri: string }; photo: boolean } | null {
+  if (!avatar) return null;
+  if (avatar.startsWith('photo:')) return { image: { uri: `${API_URL}/media/${avatar.slice(6)}` }, photo: true };
+  const sticker = stickerImages[avatar];
+  return sticker ? { image: sticker, photo: false } : null;
+}
 
 export const stickers = {
   idea: stickerImages.idea,
@@ -264,13 +273,16 @@ export function Lollipop({
   const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const grad = avatarGradient(name, skin);
-  const image = avatar ? stickerImages[avatar] : undefined;
+  const source = avatarSource(avatar);
+  const image = source?.image;
   const dot = Math.max(10, Math.round(size * 0.31));
   return (
     <View style={{ width: size, height: size }}>
       <View style={{ width: size, height: size, borderRadius: radius(skin, size / 2), overflow: 'hidden', boxShadow: '0 2px 5px rgba(27,21,48,0.25)' }}>
         <LinearGradient colors={image ? skin.stickerAvatar : grad} {...diagonal} style={StyleSheet.absoluteFill} />
-        {image ? (
+        {source?.photo ? (
+          <Image source={image} style={{ width: size, height: size }} contentFit="cover" transition={150} />
+        ) : image ? (
           <Image source={image} style={{ width: size, height: size, transform: [{ translateY: size * 0.08 }, { scale: 1.15 }] }} contentFit="contain" />
         ) : (
           <View style={styles.center}>

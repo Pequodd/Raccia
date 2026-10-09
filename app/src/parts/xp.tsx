@@ -87,7 +87,7 @@ function ListHeader({ myName, myAvatar, connected, query, onQuery, onNewChat, to
   );
 }
 
-function ChatHeader({ title, subtitle, avatar, online, onBack, wide, topInset }: ChatHeaderProps) {
+function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, wide, topInset }: ChatHeaderProps) {
   return (
     <View style={s.header}>
       <TitleBar title={`${title} — Беседа`} icon="💬" onClose={onBack} topInset={wide ? 0 : topInset} />
@@ -101,15 +101,22 @@ function ChatHeader({ title, subtitle, avatar, online, onBack, wide, topInset }:
             <Text style={s.toolText}>Назад</Text>
           </Pressable>
         ) : null}
-        <Lollipop name={title} avatar={avatar} size={34} online={online} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={s.chatName}>
-            {title}
-          </Text>
-          <Text numberOfLines={1} style={s.chatSub}>
-            {subtitle}
-          </Text>
-        </View>
+        <Pressable
+          onPress={onOpenProfile}
+          disabled={!onOpenProfile}
+          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+          accessibilityLabel={onOpenProfile ? `Свойства: ${title}` : undefined}
+        >
+          <Lollipop name={title} avatar={avatar} size={34} online={online} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={s.chatName}>
+              {title}
+            </Text>
+            <Text numberOfLines={1} style={s.chatSub}>
+              {subtitle}
+            </Text>
+          </View>
+        </Pressable>
       </View>
     </View>
   );

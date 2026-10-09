@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { AppState, Platform } from 'react-native';
 import { api } from './api';
 import { Socket } from './socket';
 import type { Chat, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
@@ -178,8 +179,19 @@ function mergeSorted(a: Message[], b: Message[]) {
   return [...a, ...b].sort((x, y) => x.id - y.id);
 }
 
+// Is Oleg on screen right now? The server skips push for people who are looking.
+function isVisible() {
+  if (Platform.OS === 'web') return typeof document === 'undefined' || document.visibilityState === 'visible';
+  return AppState.currentState === 'active';
+}
+
+// A message from someone else in a chat that is not open: the in-app banner shows it.
+export type Incoming = { key: number; message: Message; title: string };
+
 type Messenger = State & {
   me: Me;
+  incoming: Incoming | null;
+  dismissIncoming: () => void;
   setMe: (me: Me) => void;
   castVote: (candidateId: number, vote: 'for' | 'against' | null) => Promise<void>;
   dismissResult: (candidateId: number) => void;
@@ -211,6 +223,7 @@ export function MessengerProvider({
 }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [me, setMe] = useState(initialMe);
+  const [incoming, setIncoming] = useState<Incoming | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const activeRef = useRef(activeChatId);
   activeRef.current = activeChatId;
@@ -265,6 +278,9 @@ export function MessengerProvider({
           dispatch({ type: 'message', message: event.message, me: me.id, activeChatId: activeRef.current });
           if (event.message.chatId === activeRef.current && event.message.userId !== me.id) {
             setTimeout(() => markRead(event.message.chatId), 0);
+          } else if (event.message.userId !== me.id) {
+            const chat = stateRef.current.chats.find((c) => c.id === event.message.chatId);
+            setIncoming({ key: event.message.id, message: event.message, title: chat?.title ?? event.message.name });
           }
           break;
         case 'chat':
@@ -292,6 +308,7 @@ export function MessengerProvider({
       dispatch({ type: 'connected', connected });
       // After a reconnect, catch up on anything missed while offline.
       if (connected) {
+        socketRef.current?.send({ type: 'visibility', visible: isVisible() });
         refreshChats().catch(() => {});
         refreshVotes().catch(() => {});
         const active = activeRef.current;
@@ -304,6 +321,19 @@ export function MessengerProvider({
     socketRef.current = socket;
     return () => socket.close();
   }, [token, me.id, refreshChats, refreshVotes, markRead]);
+
+  useEffect(() => {
+    const report = () => socketRef.current?.send({ type: 'visibility', visible: isVisible() });
+    if (Platform.OS === 'web') {
+      if (typeof document === 'undefined') return;
+      document.addEventListener('visibilitychange', report);
+      return () => document.removeEventListener('visibilitychange', report);
+    }
+    const sub = AppState.addEventListener('change', report);
+    return () => sub.remove();
+  }, []);
+
+  const dismissIncoming = useCallback(() => setIncoming(null), []);
 
   const castVote = useCallback(async (candidateId: number, vote: 'for' | 'against' | null) => {
     const res = await api.vote(candidateId, vote);
@@ -378,6 +408,8 @@ export function MessengerProvider({
       ...state,
       me,
       setMe,
+      incoming,
+      dismissIncoming,
       castVote,
       dismissResult,
       activeChatId,
@@ -390,7 +422,7 @@ export function MessengerProvider({
       openDirect,
       createGroup,
     }),
-    [state, me, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
+    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // node:sqlite works without flags from Node 22.13 / 23.4 on; fail with a clear hint instead of a stack trace.
@@ -20,7 +21,11 @@ const DB_FILE = process.env.DB_FILE || fileURLToPath(new URL('../data/oleg.db', 
 const db = openDb(DB_FILE);
 // VOTE_MS shortens the initiation vote for local testing (default: 5 minutes).
 const voteMs = Number(process.env.VOTE_MS) || undefined;
-const { app, server, wss } = createServer(db, { voteMs });
+// Photos live next to the database (on a VPS: /var/lib/oleg/uploads).
+const uploadDir = process.env.UPLOAD_DIR || join(dirname(DB_FILE), 'uploads');
+// Push services want a contact for the sender; set VAPID_SUBJECT=mailto:you@example.com.
+const subject = process.env.VAPID_SUBJECT || 'mailto:oleg@example.com';
+const { app, server, wss } = createServer(db, { voteMs, uploadDir, push: { subject } });
 
 // Serve the built web version (app/dist) from the same address, if it has been built:
 // one port for everything — handy in Codespaces and on a single server.

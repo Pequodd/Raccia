@@ -1,12 +1,18 @@
+import { randomBytes } from 'node:crypto';
+import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
+import { join } from 'node:path';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { hashPassword, verifyPassword, newToken } from './auth.js';
+import { createPush } from './push.js';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_PAGE = 100;
 const MAX_NAME_LENGTH = 32;
+const MAX_BIO_LENGTH = 140;
+const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 const VOTE_MS = 5 * 60_000;
 
 // Sticker ids a user may pick as an avatar (app/assets/stickers/webp).
@@ -19,11 +25,26 @@ const DEFAULT_AVATAR = 'idea';
 
 // Shown name: «Олег#N» until initiated, then the chosen name (or the login nick).
 const NAME_SQL = `CASE WHEN u.status = 'initiated' THEN COALESCE(u.display_name, u.username) ELSE 'Олег#' || u.id END`;
-const AVATAR_SQL = `CASE WHEN u.status = 'initiated' THEN u.avatar ELSE '${DEFAULT_AVATAR}' END`;
-const USER_COLS = `u.id, u.username, ${NAME_SQL} AS name, ${AVATAR_SQL} AS avatar, u.status, u.is_admin`;
+// A photo goes out as «photo:<file>»; the app loads it from /media/<file>.
+const AVATAR_SQL = `CASE WHEN u.status != 'initiated' THEN '${DEFAULT_AVATAR}'
+  WHEN u.avatar = 'photo' AND u.photo IS NOT NULL THEN 'photo:' || u.photo
+  WHEN u.avatar = 'photo' THEN NULL ELSE u.avatar END`;
+const BIO_SQL = `CASE WHEN u.status = 'initiated' THEN u.bio END`;
+const USER_COLS = `u.id, u.username, ${NAME_SQL} AS name, ${AVATAR_SQL} AS avatar, ${BIO_SQL} AS bio, u.status, u.is_admin, u.created_at, u.onboarded`;
 
-export function createServer(db, { voteMs = VOTE_MS } = {}) {
+// What an uploaded picture really is, by its first bytes (the Content-Type is only a claim).
+function imageType(buf) {
+  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
+  if (buf.length > 8 && buf.readUInt32BE(0) === 0x89504e47) return 'png';
+  if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'webp';
+  return null;
+}
+
+// uploadDir: where photos go (served at /media). push: options for createPush (tests swap the sender).
+export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOptions } = {}) {
   const app = express();
+  const push = createPush(db, pushOptions);
+  if (uploadDir) mkdirSync(uploadDir, { recursive: true });
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -49,7 +70,12 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
       WHERE (u.username LIKE ?1 ESCAPE '\\' OR ${NAME_SQL} LIKE ?1 ESCAPE '\\') AND u.id != ?2
       ORDER BY name LIMIT 20
     `),
-    setProfile: db.prepare('UPDATE users SET display_name = ?, avatar = ? WHERE id = ?'),
+    setProfile: db.prepare('UPDATE users SET display_name = ?, avatar = ?, bio = ? WHERE id = ?'),
+    profileRow: db.prepare('SELECT username, display_name, avatar, bio, photo FROM users WHERE id = ?'),
+    setPhoto: db.prepare("UPDATE users SET photo = ?, avatar = 'photo' WHERE id = ?"),
+    setOnboarded: db.prepare('UPDATE users SET onboarded = 1 WHERE id = ?'),
+    invitedCount: db.prepare('SELECT COUNT(*) AS n FROM users WHERE invited_by = ?'),
+    chatInfo: db.prepare('SELECT type, title FROM chats WHERE id = ?'),
     initiatedIds: db.prepare("SELECT id FROM users WHERE status = 'initiated'"),
     allIds: db.prepare('SELECT id FROM users'),
     candidates: db.prepare("SELECT id FROM users WHERE status = 'candidate'"),
@@ -130,6 +156,8 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
   };
 
   const isOnline = (userId) => sockets.has(userId);
+  // Someone has Oleg open in front of them (a visible tab or the app on screen): no push needed.
+  const isWatching = (userId) => [...(sockets.get(userId) ?? [])].some((ws) => ws.visible !== false);
 
   function userView(row) {
     return {
@@ -137,13 +165,34 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
       username: row.username,
       name: row.name,
       avatar: row.avatar ?? null,
+      bio: row.bio ?? null,
       status: row.status,
       online: isOnline(row.id),
     };
   }
 
+  // A fuller card for the profile screen: when they joined and who brought them.
+  function profileView(id) {
+    const row = q.userById.get(id);
+    if (!row) return null;
+    const inviter = row.invited_by ? q.userById.get(row.invited_by) : null;
+    return {
+      ...userView(row),
+      joinedAt: row.created_at,
+      invitedBy: inviter ? userView(inviter) : null,
+      invitedCount: q.invitedCount.get(id).n,
+    };
+  }
+
   function meView(row) {
-    return { ...userView(row), isAdmin: Boolean(row.is_admin) };
+    return {
+      ...profileView(row.id),
+      isAdmin: Boolean(row.is_admin),
+      onboarded: Boolean(row.onboarded),
+      push: push.count(row.id) > 0,
+      // The uploaded photo, even while a sticker is the avatar: so it can be picked again.
+      photo: row.status === 'initiated' && q.profileRow.get(row.id).photo ? `photo:${q.profileRow.get(row.id).photo}` : null,
+    };
   }
 
   function messageView(row) {
@@ -219,6 +268,17 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
     const members = memberIds(chatId);
     for (const uid of members) send(uid, { type: 'message', message });
     for (const uid of members) if (uid !== userId && isOnline(uid)) markDelivered(chatId, uid, id);
+    const chat = q.chatInfo.get(chatId);
+    const text = body.length > 180 ? body.slice(0, 180) + '…' : body;
+    for (const uid of members) {
+      if (uid === userId || isWatching(uid)) continue;
+      push.notify(uid, {
+        title: kind === 'service' ? 'Олег' : chat.type === 'group' ? chat.title : message.name,
+        body: chat.type === 'group' && kind !== 'service' ? `${message.name}: ${text}` : text,
+        tag: `chat-${chatId}`,
+        url: `/?chat=${chatId}`,
+      });
+    }
     return message;
   }
 
@@ -291,6 +351,14 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
     const user = userView(q.userById.get(candidateId));
     broadcast(() => ({ type: 'vote_result', candidateId, accepted, yes: yes ?? 0, no: no ?? 0, user }));
     send(candidateId, { type: 'me', user: meView(q.userById.get(candidateId)) });
+    push.notify(candidateId, {
+      title: accepted ? 'Тебя впустили!' : 'Абоненты сказали «нет»',
+      body: accepted
+        ? `Голоса: ${yes ?? 0} за, ${no ?? 0} против. Теперь можно выбрать имя и фото.`
+        : `Голоса: ${yes ?? 0} за, ${no ?? 0} против. Писать можно, но ты навсегда Олег#${candidateId}.`,
+      tag: `vote-${candidateId}`,
+      url: '/',
+    });
   }
 
   // Votes survive a restart: reschedule the ones still running.
@@ -311,6 +379,8 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
   app.use(express.json({ limit: '64kb' }));
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
+  // Uploaded photos. Every upload gets a new file name, so they can be cached forever.
+  if (uploadDir) app.use('/media', express.static(uploadDir, { immutable: true, maxAge: '365d', index: false }));
 
   // Who sent this invite — shown on the registration screen.
   app.get('/api/invites/:code', (req, res) => {
@@ -361,6 +431,15 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
       send(invite.created_by, { type: 'chat', chat: getChat(chatId, invite.created_by) });
       scheduleVote(userId, endsAt);
       broadcastVote(userId);
+      for (const { id } of q.initiatedIds.all()) {
+        if (isWatching(id)) continue;
+        push.notify(id, {
+          title: 'Новый абонент!',
+          body: `Олег#${userId} стучится по инвайту ${invite.inviter}. Впустить? На решение 5 минут.`,
+          tag: `vote-${userId}`,
+          url: '/',
+        });
+      }
     }
 
     res.status(201).json(issueSession(userId));
@@ -392,26 +471,101 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
 
   app.get('/api/me', requireAuth, (req, res) => res.json({ user: meView(req.user) }));
 
-  // Name and avatar: only for the initiated.
+  // Tell everyone who sees this user that the name, avatar or bio changed.
+  function announceProfile(userId) {
+    const me = meView(q.userById.get(userId));
+    const user = userView(q.userById.get(userId));
+    send(userId, { type: 'me', user: me });
+    for (const id of contactsOf(userId)) send(id, { type: 'user', user });
+    return me;
+  }
+
+  // Name, avatar, bio: only for the initiated.
   app.post('/api/me', requireAuth, (req, res) => {
     if (req.user.status !== 'initiated') {
       return res.status(403).json({ error: 'Имя и аватар меняют только посвящённые' });
     }
-    const current = q.userById.get(req.user.id);
-    let name = req.body?.name === undefined ? current.name : req.body.name;
+    const current = q.profileRow.get(req.user.id);
+    let name = req.body?.name === undefined ? (current.display_name ?? current.username) : req.body.name;
     if (typeof name !== 'string' || !(name = name.trim()) || name.length > MAX_NAME_LENGTH) {
       return res.status(400).json({ error: `Имя: от 1 до ${MAX_NAME_LENGTH} символов` });
     }
     if (/^олег\s*#\s*\d+/i.test(name)) return res.status(400).json({ error: 'Это имя для непосвящённых' });
-    const avatar = req.body?.avatar === undefined ? current.avatar : req.body.avatar;
-    if (avatar !== null && !AVATARS.includes(avatar)) return res.status(400).json({ error: 'Нет такого аватара' });
 
-    q.setProfile.run(name === current.username ? null : name, avatar, req.user.id);
-    const me = meView(q.userById.get(req.user.id));
-    const user = userView(q.userById.get(req.user.id));
-    send(req.user.id, { type: 'me', user: me });
-    for (const id of contactsOf(req.user.id)) send(id, { type: 'user', user });
-    res.json({ user: me });
+    let avatar = req.body?.avatar === undefined ? current.avatar : req.body.avatar;
+    if (typeof avatar === 'string' && avatar.startsWith('photo')) avatar = 'photo';
+    if (avatar === 'photo' && !current.photo) return res.status(400).json({ error: 'Сначала загрузите фото' });
+    if (avatar !== null && avatar !== 'photo' && !AVATARS.includes(avatar)) {
+      return res.status(400).json({ error: 'Нет такого аватара' });
+    }
+
+    let bio = req.body?.bio === undefined ? current.bio : req.body.bio;
+    if (bio !== null && typeof bio !== 'string') return res.status(400).json({ error: 'О себе: текст' });
+    bio = bio?.trim() || null;
+    if (bio && bio.length > MAX_BIO_LENGTH) {
+      return res.status(400).json({ error: `О себе: до ${MAX_BIO_LENGTH} символов` });
+    }
+
+    q.setProfile.run(name === current.username ? null : name, avatar, bio, req.user.id);
+    res.json({ user: announceProfile(req.user.id) });
+  });
+
+  // Own photo as the avatar. The app crops and shrinks it first; here we only check
+  // that it really is a picture and not too big.
+  app.post(
+    '/api/me/photo',
+    requireAuth,
+    express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: MAX_PHOTO_BYTES }),
+    (req, res) => {
+      if (!uploadDir) return res.status(503).json({ error: 'Загрузка фото отключена' });
+      if (req.user.status !== 'initiated') {
+        return res.status(403).json({ error: 'Фото ставят только посвящённые' });
+      }
+      const buf = Buffer.isBuffer(req.body) ? req.body : null;
+      const ext = buf && imageType(buf);
+      if (!ext) return res.status(400).json({ error: 'Нужна картинка JPEG, PNG или WebP' });
+
+      const file = `${req.user.id}-${randomBytes(6).toString('hex')}.${ext}`;
+      writeFileSync(join(uploadDir, file), buf);
+      const old = q.profileRow.get(req.user.id).photo;
+      q.setPhoto.run(file, req.user.id);
+      if (old) {
+        try {
+          unlinkSync(join(uploadDir, old));
+        } catch {
+          // already gone
+        }
+      }
+      res.status(201).json({ user: announceProfile(req.user.id) });
+    }
+  );
+
+  app.post('/api/me/onboarded', requireAuth, (req, res) => {
+    q.setOnboarded.run(req.user.id);
+    res.json({ user: meView(q.userById.get(req.user.id)) });
+  });
+
+  app.get('/api/users/:id', requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const user = Number.isInteger(id) ? profileView(id) : null;
+    if (!user) return res.status(404).json({ error: 'Абонент не найден' });
+    res.json({ user });
+  });
+
+  // --- Push ---
+
+  app.get('/api/push/key', (req, res) => res.json({ publicKey: push.publicKey }));
+
+  app.post('/api/push/subscribe', requireAuth, (req, res) => {
+    if (!push.subscribe(req.user.id, req.body?.subscription)) {
+      return res.status(400).json({ error: 'Неверная подписка' });
+    }
+    res.json({ ok: true });
+  });
+
+  app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
+    push.unsubscribe(req.user.id, req.body?.endpoint);
+    res.json({ ok: true });
   });
 
   app.post('/api/invites', requireAuth, (req, res) => {
@@ -536,6 +690,10 @@ export function createServer(db, { voteMs = VOTE_MS } = {}) {
       try {
         msg = JSON.parse(raw.toString());
       } catch {
+        return;
+      }
+      if (msg?.type === 'visibility') {
+        ws.visible = Boolean(msg.visible);
         return;
       }
       if (msg?.type === 'typing') {

@@ -38,6 +38,7 @@ export type ChatHeaderProps = {
   avatar: string | null;
   online: boolean;
   onBack?: () => void;
+  onOpenProfile?: () => void; // direct chats: tap the title to see who that is
   wide: boolean;
   topInset: number;
 };

@@ -59,6 +59,9 @@ export function openDb(file) {
   addColumn(db, 'users', 'vote_ends_at', 'INTEGER');
   addColumn(db, 'users', 'is_admin', 'INTEGER NOT NULL DEFAULT 0');
   addColumn(db, 'messages', 'kind', "TEXT NOT NULL DEFAULT 'text'");
+  addColumn(db, 'users', 'bio', 'TEXT');
+  addColumn(db, 'users', 'photo', 'TEXT'); // file name in the uploads dir; avatar = 'photo' shows it
+  addColumn(db, 'users', 'onboarded', 'INTEGER NOT NULL DEFAULT 0');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS invites (
@@ -74,6 +77,21 @@ export function openDb(file) {
       voter_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       vote         TEXT NOT NULL CHECK (vote IN ('for', 'against')),
       PRIMARY KEY (candidate_id, voter_id)
+    );
+
+    -- Web Push subscriptions: one per browser / installed PWA.
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint   TEXT PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      p256dh     TEXT NOT NULL,
+      auth       TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS push_subscriptions_user ON push_subscriptions(user_id);
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
   `);
   return db;

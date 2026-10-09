@@ -14,6 +14,7 @@ import {
   type TextInputKeyPressEventData,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { UserCard } from '../components/profile';
 import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../components/y2k';
 import { makeStyles, radius, useSkin } from '../skins';
 import { useParts } from '../parts';
@@ -43,6 +44,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const [error, setError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const parts = useParts();
+  const [profileId, setProfileId] = useState<number | null>(null);
 
   useEffect(() => {
     setText('');
@@ -99,6 +101,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   }
 
   const other = chat.type === 'direct' ? others[0] : undefined;
+  const openProfile = other ? () => setProfileId(other.id) : undefined;
   let subtitle: string;
   if (t) subtitle = chat.type === 'group' ? `${t.name} ${skin.copy.typing}` : skin.copy.typing;
   else if (chat.type === 'group') {
@@ -219,6 +222,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
           avatar={other?.avatar ?? null}
           online={!!other?.online}
           onBack={wide ? undefined : onBack}
+          onOpenProfile={openProfile}
           wide={wide}
           topInset={insets.top}
         />
@@ -230,19 +234,30 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
             ) : (
               <ChromeButton size={38} onPress={onBack ?? (() => {})} label="Назад" icon={<Icon name="back" size={18} />} />
             )}
-            <View style={[styles.headerTitles, wide && { alignItems: 'flex-start' }]}>
+            <Pressable
+              onPress={openProfile}
+              disabled={!openProfile}
+              style={[styles.headerTitles, wide && { alignItems: 'flex-start' }]}
+              accessibilityRole={openProfile ? 'button' : undefined}
+              accessibilityLabel={openProfile ? `Профиль: ${chat.title}` : undefined}
+            >
               <Text numberOfLines={1} style={styles.headerTitle}>
                 {chat.title}
               </Text>
               <Text numberOfLines={1} style={styles.headerSubtitle}>
                 {subtitle}
               </Text>
-            </View>
-            {wide ? null : <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />}
+            </Pressable>
+            {wide ? null : (
+              <Pressable onPress={openProfile} disabled={!openProfile} accessibilityLabel={openProfile ? `Профиль: ${chat.title}` : undefined}>
+                <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />
+              </Pressable>
+            )}
           </View>
         </Chrome>
       )}
 
+      <UserCard userId={profileId} onClose={() => setProfileId(null)} />
       <FlatList
         inverted
         data={rows}

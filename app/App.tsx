@@ -10,6 +10,9 @@ import { Chrome, ChromeButton, ChromeLogo, GridBackground, Icon, Lollipop, Plast
 import { makeStyles, radius, SkinProvider, useSkin } from './src/skins';
 import { skinFonts } from './src/skins/fonts';
 import { ProfileScreen, SettingsScreen } from './src/screens/AccountScreens';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { InAppBanner, InstallSheet } from './src/components/notify';
+import { chatFromUrl, disablePush, onOpenFromNotification, registerServiceWorker, resubscribe, setUnreadBadge } from './src/push';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatListScreen, SearchField, type NewChatMode } from './src/screens/ChatListScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
@@ -76,6 +79,7 @@ function Root() {
 
   useEffect(() => {
     restore();
+    registerServiceWorker();
   }, [restore]);
 
   const onAuth = useCallback(async (token: string, user: Me) => {
@@ -83,9 +87,13 @@ function Root() {
     await tokenStorage.set(token);
     setAuthToken(token);
     setSession({ token, user });
+    // This browser already allowed push for someone: now it belongs to this account.
+    resubscribe();
   }, []);
 
   const onLogout = useCallback(async () => {
+    // Push on this device stops with the session, or the next person here gets our messages.
+    await disablePush().catch(() => {});
     api.logout().catch(() => {});
     await tokenStorage.clear();
     setAuthToken(null);
@@ -109,6 +117,7 @@ function Root() {
         ) : (
           <AuthScreen onAuth={onAuth} initialInvite={inviteFromUrl()} />
         )}
+        {fontsLoaded ? <InstallSheet /> : null}
       </View>
     </SafeAreaProvider>
   );
@@ -137,7 +146,9 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
   const skin = useSkin();
   const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
-  const [activeChatId, setActiveChat] = useState<number | null>(null);
+  // Opened from a notification: start in that chat.
+  const [activeChatId, setActiveChat] = useState<number | null>(chatFromUrl);
+  useEffect(() => onOpenFromNotification((chatId) => chatId && setActiveChat(chatId)), []);
   return (
     <MessengerProvider me={session.user} token={session.token} activeChatId={activeChatId} setActiveChat={setActiveChat}>
       <Shell onLogout={onLogout} />
@@ -145,13 +156,27 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
   );
 }
 
+// First run goes through onboarding; afterwards the messenger with the in-app banner on top.
 function Shell({ onLogout }: { onLogout: () => void }) {
+  const { me } = useMessenger();
+  if (!me.onboarded) return <OnboardingScreen />;
+  return (
+    <View style={{ flex: 1 }}>
+      <ShellBody onLogout={onLogout} />
+      <InAppBanner />
+    </View>
+  );
+}
+
+function ShellBody({ onLogout }: { onLogout: () => void }) {
   const skin = useSkin();
   const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE_BREAKPOINT;
-  const { me, activeChatId, setActiveChat } = useMessenger();
+  const { me, activeChatId, setActiveChat, chats } = useMessenger();
+  const unread = chats.reduce((n, c) => n + c.unread, 0);
+  useEffect(() => setUnreadBadge(unread), [unread]);
   const [tab, setTab] = useState<Tab>('chats');
   const [composing, setComposing] = useState<NewChatMode | null>(null);
   const [query, setQuery] = useState('');
