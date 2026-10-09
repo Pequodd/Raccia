@@ -130,3 +130,7 @@ export function plural(n: number, one: string, few: string, many: string) {
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
   return many;
 }
+
+// The headline feature. Oleg runs on a Sber server, which is the joke.
+export const promise = 'БЕЗ ЦЕНЗУРЫ\nИ БЛОКИРОВОК РКН!';
+export const promiseProof = '✓ Сервер любезно предоставлен Сбером';

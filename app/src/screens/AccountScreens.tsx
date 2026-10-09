@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api';
 import { Chrome, Lcd, Lollipop, Plastic, stickerImages } from '../components/y2k';
 import { useMessenger } from '../store';
-import { colors, fonts, plastic } from '../y2k';
+import { colors, fonts, plastic, promise, promiseProof } from '../y2k';
 
 function Page({ title, wide, children }: { title: string; wide: boolean; children: ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -105,6 +105,11 @@ export function SettingsScreen({ onLogout, wide }: { onLogout: () => void; wide:
         </Plastic>
       </View>
       <Text style={styles.footer}>ОЛЕГ v0.1 · СОВМЕСТИМО С ПРОБЛЕМОЙ 2000 ✓</Text>
+      <Text style={styles.footer}>
+        {promise.replace('\n', ' ')}
+        {'\n'}
+        {promiseProof}
+      </Text>
     </Page>
   );
 }

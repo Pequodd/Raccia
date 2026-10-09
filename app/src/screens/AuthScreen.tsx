@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError } from '../api';
 import { parseInvite } from '../config';
 import { ChromeLogo, Plastic, stickers } from '../components/y2k';
-import { colors, diagonal, fonts, plastic } from '../y2k';
+import { colors, diagonal, fonts, plastic, promise, promiseProof } from '../y2k';
 import type { Me } from '../types';
 
 type Problem = { kind: 'auth' | 'offline' | 'other'; text: string };
@@ -104,6 +104,10 @@ export function AuthScreen({
             <ChromeLogo size={58} />
           </View>
           <Text style={styles.slogan}>НеМногонациональный мессенджер Олег</Text>
+          <Plastic colors={plastic.lime} radius={18} style={styles.promo} shadow="0 6px 16px rgba(124,194,30,0.45)">
+            <Text style={styles.promoTitle}>{promise}</Text>
+            <Text style={styles.promoProof}>{promiseProof}</Text>
+          </Plastic>
 
           <View style={styles.fields}>
             {mode === 'register' ? (
@@ -287,4 +291,14 @@ const styles = StyleSheet.create({
   link: { fontFamily: fonts.bodyHeavy, color: colors.bondiText },
   inviter: { fontFamily: fonts.bodyHeavy, fontSize: 13, color: colors.grapeText, paddingLeft: 16, marginTop: 5 },
   footer: { fontFamily: fonts.mono, fontSize: 11, color: colors.text4, textAlign: 'center', marginTop: 24 },
+  promo: {
+    marginTop: 14,
+    marginHorizontal: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    transform: [{ rotate: '-2.5deg' }],
+  },
+  promoTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 25, color: '#1F3300', textAlign: 'center' },
+  promoProof: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: '#1F3300', textAlign: 'center', marginTop: 4 },
 });
