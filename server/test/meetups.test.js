@@ -52,7 +52,6 @@ test('сходка: bars, meetup card, answers', async () => {
   assert.equal(msg.meetup.place.name, 'Бар «Тест»');
   assert.equal(msg.meetup.place.phone, '+7 (351) 000-00-00');
   assert.equal(msg.meetup.undecided, 2);
-  assert.ok(msg.meetup.number > 4800);
   assert.match(msg.body, /^Бар «Тест» · /);
 
   // Free-text place, and bad times.
@@ -75,4 +74,31 @@ test('сходка: bars, meetup card, answers', async () => {
   const history = (await api(`/api/chats/${chatId}/messages`, admin.token)).data.messages;
   assert.equal(history.find((m) => m.id === msg.id).meetup.place.name, 'Бар «Тест»');
   ws.close();
+});
+
+test('forwarding keeps the original author and the attachment', async () => {
+  const u = (await api('/api/login', null, { username: 'admin', password: 'secret1' })).data;
+  const f = (await api('/api/login', null, { username: 'friend', password: 'secret1' })).data;
+  const chats = (await api('/api/chats', u.token)).data.chats;
+  const direct = chats[0].id;
+  const group = (await api('/api/chats/group', u.token, { title: 'Туса', memberIds: [f.user.id] })).data.chat.id;
+  const original = (await api(`/api/chats/${direct}/messages`, f.token, { body: 'ключи на гвоздике' })).data.message;
+
+  let r = await api(`/api/messages/${original.id}/forward`, u.token, { chatIds: [group] });
+  assert.equal(r.status, 201);
+  const fwd = r.data.messages[0];
+  assert.equal(fwd.body, 'ключи на гвоздике');
+  assert.equal(fwd.userId, u.user.id);
+  assert.equal(fwd.forwardedFrom, f.user.name); // a candidate: «Олег#2»
+
+  // Forwarding a forward keeps the first author.
+  r = await api(`/api/messages/${fwd.id}/forward`, f.token, { chatIds: [direct] });
+  assert.equal(r.data.messages[0].forwardedFrom, f.user.name);
+
+  // Not into chats you are not in, not service lines, not nothing.
+  const other = (await api('/api/chats/group', u.token, { title: 'Только я', memberIds: [] })).data.chat.id;
+  assert.equal((await api(`/api/messages/${original.id}/forward`, f.token, { chatIds: [other] })).status, 404);
+  assert.equal((await api(`/api/messages/${original.id}/forward`, f.token, { chatIds: [] })).status, 400);
+  const service = (await api(`/api/chats/${direct}/messages`, u.token)).data.messages.find((m) => m.kind === 'service');
+  assert.equal((await api(`/api/messages/${service.id}/forward`, u.token, { chatIds: [group] })).status, 400);
 });

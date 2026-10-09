@@ -59,7 +59,8 @@ export function openDb(file) {
   addColumn(db, 'users', 'vote_ends_at', 'INTEGER');
   addColumn(db, 'users', 'is_admin', 'INTEGER NOT NULL DEFAULT 0');
   addColumn(db, 'messages', 'kind', "TEXT NOT NULL DEFAULT 'text'");
-  addColumn(db, 'messages', 'media', 'TEXT'); // JSON: { file, width, height, duration, size } for photo/video/voice/circle
+  addColumn(db, 'messages', 'media', 'TEXT');
+  addColumn(db, 'messages', 'forwarded_from', 'TEXT'); // shown name of the original author // JSON: { file, width, height, duration, size } for photo/video/voice/circle
   addColumn(db, 'users', 'bio', 'TEXT');
   addColumn(db, 'users', 'photo', 'TEXT'); // file name in the uploads dir; avatar = 'photo' shows it
   addColumn(db, 'users', 'onboarded', 'INTEGER NOT NULL DEFAULT 0');

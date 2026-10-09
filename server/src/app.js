@@ -136,17 +136,17 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     insertChat: db.prepare('INSERT INTO chats (type, title, direct_key, created_at) VALUES (?, ?, ?, ?)'),
     insertMember: db.prepare('INSERT OR IGNORE INTO chat_members (chat_id, user_id) VALUES (?, ?)'),
     messageById: db.prepare(`
-      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.media, m.created_at
+      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.media, m.forwarded_from, m.created_at
       FROM messages m JOIN users u ON u.id = m.user_id WHERE m.id = ?
     `),
     messagesPage: db.prepare(`
-      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.media, m.created_at
+      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.media, m.forwarded_from, m.created_at
       FROM messages m JOIN users u ON u.id = m.user_id
       WHERE m.chat_id = ? AND m.id < ?
       ORDER BY m.id DESC LIMIT ?
     `),
     insertMessage: db.prepare(
-      'INSERT INTO messages (chat_id, user_id, body, created_at, kind, media) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO messages (chat_id, user_id, body, created_at, kind, media, forwarded_from) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ),
     markRead: db.prepare(
       'UPDATE chat_members SET last_read_id = MAX(last_read_id, ?1), last_delivered_id = MAX(last_delivered_id, ?1) WHERE chat_id = ?2 AND user_id = ?3'
@@ -227,6 +227,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       userId: row.user_id,
       kind: row.kind,
       media,
+      forwardedFrom: row.forwarded_from ?? null,
       name: row.name,
       body: row.body,
       createdAt: row.created_at,
@@ -287,9 +288,10 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     for (const uid of memberIds(chatId)) send(uid, { type: 'delivered', chatId, userId, messageId });
   }
 
-  function postMessage(chatId, userId, body, kind = 'text', media = null) {
+  function postMessage(chatId, userId, body, kind = 'text', media = null, forwardedFrom = null) {
     const id = Number(
-      q.insertMessage.run(chatId, userId, body, Date.now(), kind, media ? JSON.stringify(media) : null).lastInsertRowid
+      q.insertMessage.run(chatId, userId, body, Date.now(), kind, media ? JSON.stringify(media) : null, forwardedFrom)
+        .lastInsertRowid
     );
     if (kind !== 'service') q.markRead.run(id, chatId, userId);
     const message = messageView(q.messageById.get(id));
@@ -760,6 +762,34 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     const message = messageView(q.messageById.get(m.message_id));
     for (const uid of memberIds(m.chat_id)) send(uid, { type: 'meetup', chatId: m.chat_id, message });
     res.json({ message });
+  });
+
+  // Forward one message into other chats. Attachments share the same file; a meetup
+  // travels as its text; the original author's name goes along.
+  app.post('/api/messages/:id/forward', requireAuth, (req, res) => {
+    const original = q.messageById.get(Number(req.params.id));
+    if (!original || !q.isMember.get(original.chat_id, req.user.id)) {
+      return res.status(404).json({ error: 'Сообщение не найдено' });
+    }
+    if (original.kind === 'service') return res.status(400).json({ error: 'Служебные сообщения не пересылаются' });
+    const chatIds = Array.isArray(req.body?.chatIds) ? [...new Set(req.body.chatIds.map(Number))] : [];
+    if (!chatIds.length || chatIds.length > 20) return res.status(400).json({ error: 'Выберите от 1 до 20 чатов' });
+    if (chatIds.some((id) => !Number.isInteger(id) || !q.isMember.get(id, req.user.id))) {
+      return res.status(404).json({ error: 'Чат не найден' });
+    }
+    const from = original.forwarded_from ?? original.name;
+    const asText = original.kind === 'meetup';
+    const messages = chatIds.map((chatId) =>
+      postMessage(
+        chatId,
+        req.user.id,
+        asText ? `🍺 Сходка: ${original.body}` : original.body,
+        asText ? 'text' : original.kind,
+        asText || !original.media ? null : JSON.parse(original.media),
+        from
+      )
+    );
+    res.status(201).json({ messages });
   });
 
   app.post('/api/chats/:id/read', requireAuth, requireMember, (req, res) => {

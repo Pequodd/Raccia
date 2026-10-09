@@ -14,6 +14,7 @@ import {
   type TextInputKeyPressEventData,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ForwardSheet, MessageActions } from '../components/forward';
 import { MeetupCard, MeetupSheet } from '../components/meetup';
 import { UserCard } from '../components/profile';
 import { CircleRecorder } from '../media/CircleRecorder';
@@ -56,6 +57,8 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const [draft, setDraft] = useState<MediaDraft | null>(null);
   const [circling, setCircling] = useState(false);
   const [meeting, setMeeting] = useState(false);
+  const [acting, setActing] = useState<Message | null>(null); // long-pressed message
+  const [forwarding, setForwarding] = useState<Message | null>(null);
   const voice = useVoiceRecorder();
   useEffect(() => {
     if (voice.error) setError(voice.error);
@@ -233,7 +236,13 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       case 'message': {
         const m = item.message;
         const mine = m.userId === me.id;
-        if (m.kind === 'meetup') return <MeetupCard message={m} />;
+        if (m.kind === 'meetup') {
+          return (
+            <Pressable onLongPress={() => setActing(m)} delayLongPress={400}>
+              <MeetupCard message={m} />
+            </Pressable>
+          );
+        }
         const media: MediaView | null =
           m.media && m.kind !== 'text' && m.kind !== 'service'
             ? {
@@ -245,22 +254,29 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
                 duration: m.media.duration,
               }
             : null;
+        const forwarded = m.forwardedFrom ? (
+          <Text style={[styles.forwarded, { color: mine ? skin.bubbles.mine.meta : skin.bubbles.theirs.meta }, media && styles.captionPad]} numberOfLines={1}>
+            ↪ Переслано от {m.forwardedFrom}
+          </Text>
+        ) : null;
         if (media?.kind === 'circle') {
           return (
-            <View style={[styles.circleRow, { alignItems: mine ? 'flex-end' : 'flex-start' }]}>
+            <Pressable onLongPress={() => setActing(m)} delayLongPress={400} style={[styles.circleRow, { alignItems: mine ? 'flex-end' : 'flex-start' }]}>
+              {forwarded}
               {!mine && item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name, skin) }]}>{m.name}</Text> : null}
               <MediaContent media={media} mine={mine} />
               <Text style={styles.circleMeta}>
                 {mine ? `${skin.copy.ticks[ticksFor(m.id) - 1]} · ` : ''}
                 {clockTime(m.createdAt)}
               </Text>
-            </View>
+            </Pressable>
           );
         }
         if (mine) {
           const ticks = ticksFor(m.id);
           return (
-            <Bubble mine tail={item.tail} media={!!media}>
+            <Bubble mine tail={item.tail} media={!!media} onLongPress={() => setActing(m)}>
+              {forwarded}
               {media ? <MediaContent media={media} mine /> : null}
               {m.body ? <Text style={[styles.textMine, media && styles.captionPad]}>{m.body}</Text> : null}
               <View style={[styles.metaRow, media && styles.captionPad]}>
@@ -274,8 +290,9 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
           );
         }
         return (
-          <Bubble mine={false} tail={item.tail} media={!!media}>
+          <Bubble mine={false} tail={item.tail} media={!!media} onLongPress={() => setActing(m)}>
             {item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name, skin) }, media && styles.captionPad]}>{m.name}</Text> : null}
+            {forwarded}
             {media ? <MediaContent media={media} mine={false} /> : null}
             {m.body ? <Text style={[styles.textTheirs, media && styles.captionPad]}>{m.body}</Text> : null}
             <Text style={[styles.metaTheirs, media && styles.captionPad]}>{clockTime(m.createdAt)}</Text>
@@ -353,6 +370,8 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
       <AttachSheet visible={attaching} onPick={pick} onMeetup={() => setMeeting(true)} onClose={() => setAttaching(false)} />
       <MeetupSheet chatId={chatId} visible={meeting} onClose={() => setMeeting(false)} />
+      <MessageActions message={acting} onForward={setForwarding} onClose={() => setActing(null)} />
+      <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} />
       <AttachPreview
         draft={draft}
         onClose={() => setDraft(null)}
@@ -427,12 +446,14 @@ function Bubble({
   tail,
   failed,
   media,
+  onLongPress,
   children,
 }: {
   mine: boolean;
   tail: boolean;
   failed?: boolean;
   media?: boolean; // an attachment: the picture goes almost edge to edge
+  onLongPress?: () => void; // forward / copy
   children: React.ReactNode;
 }) {
   const skin = useSkin();
@@ -446,7 +467,10 @@ function Bubble({
   const shine = skin.bubbles.shine;
   return (
     <View style={[styles.bubbleRow, { justifyContent: mine ? 'flex-end' : 'flex-start' }]}>
-      <View
+      <Pressable
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        disabled={!onLongPress}
         style={[
           styles.bubble,
           corners,
@@ -466,7 +490,7 @@ function Bubble({
           ) : null}
         </View>
         {children}
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -510,6 +534,7 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   bubbleRow: { flexDirection: 'row', flexShrink: 0 },
   bubbleMedia: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 5 },
   captionPad: { paddingHorizontal: 8 },
+  forwarded: { fontFamily: fonts.bodyBold, fontSize: 12, marginBottom: 2 },
   circleRow: { gap: 3, flexShrink: 0 },
   circleMeta: { fontFamily: fonts.mono, fontSize: 11, color: colors.text3, paddingHorizontal: 8 },
   bubble: { maxWidth: '80%', paddingHorizontal: 13, paddingTop: 8, paddingBottom: 6, flexShrink: 0 },

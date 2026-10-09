@@ -136,7 +136,6 @@ export function createMeetups(db) {
       const notGoing = pick('no');
       return {
         id: m.id,
-        number: 4800 + m.id, // «Заявка №4815» — the Ministry likes big numbers
         place: JSON.parse(m.place),
         startsAt: m.starts_at,
         createdBy: { id: m.created_by, name: nameOf(m.created_by) },

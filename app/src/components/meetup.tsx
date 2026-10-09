@@ -18,7 +18,7 @@ export function meetupWhen(ts: number) {
 export function MeetupCard({ message }: { message: Message }) {
   const styles = useStyles();
   const skin = useSkin();
-  const { roles, colors } = skin;
+  const { roles } = skin;
   const { me, replaceMessage } = useMessenger();
   const [busy, setBusy] = useState(false);
   const m = message.meetup;
@@ -86,9 +86,6 @@ export function MeetupCard({ message }: { message: Message }) {
         ) : null}
         <ChromeButton label="🗺 На карте и бронь" onPress={() => Linking.openURL(m.place.mapUrl)} style={styles.button} />
       </View>
-      <Text style={[styles.stamp, { color: colors.text3 }]}>
-        Заявка №{m.number} передана в Министерство Пятничного Отдыха
-      </Text>
     </View>
   );
 }
@@ -293,7 +290,6 @@ const useStyles = makeStyles(({ colors, fonts, frames }) => ({
   row: { flexDirection: 'row', gap: 8, marginTop: 4 },
   button: { flex: 1, height: 42, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontFamily: fonts.bodyHeavy, fontSize: 15 },
-  stamp: { fontFamily: fonts.mono, fontSize: 10, marginTop: 6, textAlign: 'center' },
   scrim: { flex: 1, backgroundColor: 'rgba(10,8,20,0.45)' },
   sheet: {
     position: 'absolute',

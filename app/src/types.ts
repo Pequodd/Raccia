@@ -27,7 +27,6 @@ export type Place = { name: string; address: string | null; phone: string | null
 export type Bar = Place & { id: number };
 export type Meetup = {
   id: number;
-  number: number; // «Заявка №4815»
   place: Place;
   startsAt: number;
   createdBy: { id: number; name: string };
@@ -43,6 +42,7 @@ export type Message = {
   kind: 'text' | 'service' | 'meetup' | MediaKind;
   media: Media | null;
   meetup?: Meetup | null;
+  forwardedFrom?: string | null; // «Переслано от …»
   name: string;
   body: string; // text, or the caption of an attachment
   createdAt: number;
