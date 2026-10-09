@@ -15,6 +15,7 @@ import { CallProvider } from './src/calls/CallProvider';
 import { CallScreen } from './src/calls/CallScreen';
 import { ConferenceProvider } from './src/calls/ConferenceProvider';
 import { ConferenceScreen } from './src/calls/ConferenceScreen';
+import { XpDesktop } from './src/parts/xpDesktop';
 import { InAppBanner, InstallSheet } from './src/components/notify';
 import { chatFromUrl, disablePush, onOpenFromNotification, registerServiceWorker, resubscribe, setUnreadBadge } from './src/push';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -174,11 +175,13 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
 // First run goes through onboarding; afterwards the messenger with the in-app banner on top.
 function Shell({ onLogout, openTick }: { onLogout: () => void; openTick: number }) {
   const { me } = useMessenger();
+  const skin = useSkin();
   if (!me.onboarded) return <OnboardingScreen />;
   return (
     <View style={{ flex: 1 }}>
       <ShellBody onLogout={onLogout} openTick={openTick} />
       <InAppBanner />
+      {skin.id === 'xp' ? <XpDesktop onLogout={onLogout} /> : null}
       <CallScreen />
       <ConferenceScreen />
     </View>

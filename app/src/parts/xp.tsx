@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { CallButtons } from '../calls/CallButtons';
+import { useMessenger } from '../store';
+import { canMaximize, toggleMaximized, useMaximized, xpWindow } from './xpDesktop';
 import { Lollipop } from '../components/y2k';
 import { clockTime } from '../y2k';
 import type { ChatHeaderProps, ListHeaderProps, Parts, TabItem } from './index';
@@ -15,14 +17,28 @@ const TASKBAR = ['#3F8CF3', '#245EDC', '#1F55CF', '#1941A5'] as const;
 
 // Minimise / maximise / close squares at the right of a title bar.
 function Caption({ onClose }: { onClose?: () => void }) {
+  const maximized = useMaximized();
   return (
     <View style={s.caption}>
-      <View style={s.capBtn}>
+      <Pressable onPress={xpWindow.minimize} accessibilityRole="button" accessibilityLabel="Свернуть" style={({ pressed }) => [s.capBtn, pressed && s.capPressed]}>
         <View style={{ width: 8, height: 2, backgroundColor: '#fff', marginTop: 8 }} />
-      </View>
-      <View style={s.capBtn}>
-        <View style={{ width: 10, height: 9, borderWidth: 1, borderTopWidth: 3, borderColor: '#fff' }} />
-      </View>
+      </Pressable>
+      <Pressable
+        onPress={toggleMaximized}
+        disabled={!canMaximize}
+        accessibilityRole="button"
+        accessibilityLabel={maximized ? 'Восстановить' : 'Развернуть'}
+        style={({ pressed }) => [s.capBtn, pressed && s.capPressed]}
+      >
+        {maximized ? (
+          <View style={{ width: 11, height: 10 }}>
+            <View style={{ position: 'absolute', right: 0, top: 0, width: 8, height: 7, borderWidth: 1, borderTopWidth: 2, borderColor: '#fff' }} />
+            <View style={{ position: 'absolute', left: 0, bottom: 0, width: 8, height: 7, borderWidth: 1, borderTopWidth: 2, borderColor: '#fff', backgroundColor: '#2A6CF0' }} />
+          </View>
+        ) : (
+          <View style={{ width: 10, height: 9, borderWidth: 1, borderTopWidth: 3, borderColor: '#fff' }} />
+        )}
+      </Pressable>
       <Pressable
         onPress={onClose}
         disabled={!onClose}
@@ -55,7 +71,7 @@ function TitleBar({ title, icon, onClose, topInset }: { title: string; icon?: st
 function ListHeader({ myName, myAvatar, connected, query, onQuery, onNewChat, topInset }: ListHeaderProps) {
   return (
     <View style={s.header}>
-      <TitleBar title="Сообщения — Олег XP" topInset={topInset} />
+      <TitleBar title="Сообщения — Олег XP" topInset={topInset} onClose={xpWindow.askShutdown} />
       <View style={s.menu}>
         {['Файл', 'Правка', 'Вид', 'Избранное', 'Справка'].map((m) => (
           <Text key={m} style={s.menuItem}>
@@ -89,9 +105,10 @@ function ListHeader({ myName, myAvatar, connected, query, onQuery, onNewChat, to
 }
 
 function ChatHeader({ title, subtitle, avatar, online, onBack, onOpenProfile, onCall, wide, topInset }: ChatHeaderProps) {
+  const { setActiveChat } = useMessenger();
   return (
     <View style={s.header}>
-      <TitleBar title={`${title} — Беседа`} icon="💬" onClose={onBack} topInset={wide ? 0 : topInset} />
+      <TitleBar title={`${title} — Беседа`} icon="💬" onClose={onBack ?? (() => setActiveChat(null))} topInset={wide ? 0 : topInset} />
       <View style={s.toolbar}>
         {onBack ? (
           <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Назад" style={({ pressed }) => [s.toolButton, pressed && s.toolPressed]}>
@@ -223,6 +240,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   close: { backgroundColor: '#D2401E' },
+  capPressed: { opacity: 0.75, transform: [{ translateY: 1 }] },
   closeX: { fontFamily: F.bold, fontSize: 13, color: '#FFFFFF' },
   menu: { flexDirection: 'row', gap: 14, paddingHorizontal: 10, paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#D8D2BD' },
   menuItem: { fontFamily: F.body, fontSize: 13, color: '#000' },
