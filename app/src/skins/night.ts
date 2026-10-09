@@ -29,6 +29,7 @@ export const night: Skin = {
     nameText: '#ECE8FF',
     fieldText: '#ECE8FF',
     chromeEdge: '#4A4566',
+    chromeInk: '#3FD8F5',
     readTick: '#3FD8F5',
     screen: '#0E0A1C',
     surface: 'rgba(255,255,255,0.07)',

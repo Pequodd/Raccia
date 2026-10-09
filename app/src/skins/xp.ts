@@ -49,6 +49,7 @@ export const xp: Skin = {
     okBorder: '#3FBF3F',
     limeAccent: '#2D8F2D',
     chromeEdge: '#0A3FAE',
+    chromeInk: '#FFFFFF',
     lcdBg: '#FFFFFF',
     lcdText: '#0A50D8',
     led: '#3FBF3F',

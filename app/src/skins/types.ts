@@ -66,6 +66,7 @@ export type Skin = {
     okBorder: string;
     limeAccent: string; // selected marks
     chromeEdge: string; // panel edges
+    chromeInk: string; // icons on chrome panels (header, composer): must read on skin.chrome
     lcdBg: string;
     lcdText: string;
     led: string;

@@ -38,6 +38,7 @@ export const y2k: Skin = {
     okBorder: 'rgba(124,194,30,0.6)',
     limeAccent: '#7CC21E',
     chromeEdge: '#8C96A0',
+    chromeInk: '#005F75',
     lcdBg: '#B5C79A',
     lcdText: '#1E2A10',
     led: '#FF3030',

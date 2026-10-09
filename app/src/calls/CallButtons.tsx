@@ -8,7 +8,7 @@ const CAMERA = 'M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1
 // 📞 and 🎥 in a chat header. color: what the header's text uses.
 export function CallButtons({ onCall, color, size = 22 }: { onCall: (video: boolean) => void; color?: string; size?: number }) {
   const { colors } = useSkin();
-  const ink = color ?? colors.accentText;
+  const ink = color ?? colors.chromeInk;
   return (
     <View style={{ flexDirection: 'row' }}>
       {([false, true] as const).map((video) => (

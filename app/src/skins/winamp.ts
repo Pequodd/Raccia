@@ -62,6 +62,7 @@ export const winamp: Skin = {
     okBorder: '#2E8B3A',
     limeAccent: '#3CFF5A',
     chromeEdge: '#14151B',
+    chromeInk: '#3CFF5A',
     lcdBg: '#050805',
     lcdText: '#3CFF5A',
     led: '#FF3B3B',

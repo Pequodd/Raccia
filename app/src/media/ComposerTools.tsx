@@ -50,7 +50,7 @@ export function ToolButton({ icon, label, onPress, color }: { icon: ToolIcon; la
   const { colors } = useSkin();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.tool, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={label} hitSlop={4}>
-      <ToolGlyph name={icon} color={color ?? colors.accentText} />
+      <ToolGlyph name={icon} color={color ?? colors.chromeInk} />
     </Pressable>
   );
 }
