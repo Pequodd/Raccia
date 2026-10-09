@@ -24,7 +24,7 @@ export function StreamView({ stream, kind, mirrored, muted, style }: { stream: M
   });
 }
 
-export type Glyph = 'phone' | 'hangup' | 'mic' | 'micOff' | 'cam' | 'camOff' | 'flip' | 'screen' | 'sound' | 'soundOff';
+export type Glyph = 'phone' | 'hangup' | 'mic' | 'micOff' | 'cam' | 'camOff' | 'flip' | 'screen' | 'sound' | 'soundOff' | 'chat' | 'cinema' | 'expand' | 'collapse';
 const GLYPHS: Record<Glyph, string> = {
   phone: 'M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z',
   hangup: 'M12 9c-1.6 0-3.15.25-4.6.72v3.1a1 1 0 0 1-.56.9 11.5 11.5 0 0 0-2.66 1.85 1 1 0 0 1-1.41 0L.29 13.1a1 1 0 0 1 0-1.41A16.9 16.9 0 0 1 12 7c4.6 0 8.75 1.83 11.7 4.7a1 1 0 0 1 0 1.4l-2.48 2.48a1 1 0 0 1-1.41 0 11.3 11.3 0 0 0-2.67-1.85 1 1 0 0 1-.56-.9v-3.1A15 15 0 0 0 12 9z',
@@ -35,10 +35,28 @@ const GLYPHS: Record<Glyph, string> = {
   screen: 'M20 3H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h6v2H8v2h8v-2h-2v-2h6a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 13H4V5h16zM11 7.5V10H8v2h3v2.5l3.5-3.5z',
   sound: 'M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.47 4.47 0 0 0 2.5-4zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06A9 9 0 0 0 14 3.23z',
   soundOff: 'M16.5 12A4.5 4.5 0 0 0 14 8v2.18l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0a6.9 6.9 0 0 1-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12a9 9 0 0 0-7-8.77v2.06A7 7 0 0 1 19 12zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25A7 7 0 0 1 14 18.7v2.06a9 9 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9zM12 4 9.91 6.09 12 8.18z',
+  chat: 'M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2zm3 5v2h10V9zm0 4v2h7v-2z',
+  cinema: 'M3 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm16 0h3v14h-3z',
+  expand: 'M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z',
+  collapse: 'M8 4h2v6H4V8h4zm6 0h2v4h4v2h-6zM4 14h6v6H8v-4H4zm10 0h6v2h-4v4h-2z',
   flip: 'M20 5h-3.2L15 3H9L7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-5 11.5V14H9v2.5L5.5 13 9 9.5V12h6V9.5l3.5 3.5z',
 };
 
-export function RoundButton({ glyph, label, onPress, tone = 'dim', active }: { glyph: Glyph; label: string; onPress: () => void; tone?: 'dim' | 'red' | 'green'; active?: boolean }) {
+export function RoundButton({
+  glyph,
+  label,
+  onPress,
+  tone = 'dim',
+  active,
+  badge,
+}: {
+  glyph: Glyph;
+  label: string;
+  onPress: () => void;
+  tone?: 'dim' | 'red' | 'green';
+  active?: boolean;
+  badge?: number;
+}) {
   const styles = useStyles();
   const bg = tone === 'red' ? '#E5393B' : tone === 'green' ? '#2FBF4F' : active ? '#FFFFFF' : 'rgba(255,255,255,0.18)';
   const fg = tone === 'dim' && active ? '#141220' : '#FFFFFF';
@@ -48,6 +66,11 @@ export function RoundButton({ glyph, label, onPress, tone = 'dim', active }: { g
         <Svg width={28} height={28} viewBox="0 0 24 24">
           <Path d={GLYPHS[glyph]} fill={fg} />
         </Svg>
+        {badge ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        ) : null}
       </Pressable>
       <Text style={styles.buttonLabel}>{label}</Text>
     </View>
@@ -146,6 +169,8 @@ const useStyles = makeStyles(({ fonts }) => ({
   controls: { flexDirection: 'row', justifyContent: 'center', gap: 22, paddingHorizontal: 16 },
   buttonWrap: { alignItems: 'center', gap: 6, width: 76 },
   round: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', right: -2, top: -2, minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 5, backgroundColor: '#FF4D6D', alignItems: 'center', justifyContent: 'center' },
+  badgeText: { fontFamily: fonts.bodyBold, fontSize: 12, color: '#FFFFFF' },
   buttonLabel: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
   toastWrap: { position: 'absolute', left: 0, right: 0, zIndex: 100, alignItems: 'center' },
   toast: {

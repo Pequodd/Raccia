@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Lollipop, Plastic } from '../components/y2k';
@@ -7,22 +7,24 @@ import { makeStyles, useSkin } from '../skins';
 import { useMessenger } from '../store';
 import { plural } from '../y2k';
 import { RoundButton, StreamView } from './CallScreen';
+import { ConfChat, useUnseen } from './ConfChat';
 import { useConference, type ConfPeer } from './ConferenceProvider';
+
+const canFullscreen = typeof document !== 'undefined' && Boolean(document.fullscreenEnabled);
 
 type Tile = { key: string; name: string; avatar: string | null; stream: MediaStream | null; mine: boolean; screen: boolean; showVideo: boolean };
 
-function TileView({ tile, big }: { tile: Tile; big?: boolean }) {
+function TileView({ tile, big, fill }: { tile: Tile; big?: boolean; fill?: boolean }) {
   const styles = useStyles();
   const win = useWindowDimensions();
-  // The big tile leaves room for the row of small ones and the buttons.
   const bigHeight = Math.min((win.width - 20) * 0.625, win.height * 0.5);
   return (
-    <View style={[styles.tile, big ? [styles.tileBig, { height: bigHeight }] : styles.tileSmall]}>
+    <View style={[styles.tile, fill ? styles.tileFill : big ? [styles.tileBig, { height: bigHeight }] : styles.tileSmall]}>
       {tile.showVideo && tile.stream ? (
         <StreamView stream={tile.stream} kind="video" muted={tile.mine} mirrored={tile.mine && !tile.screen} style={tile.screen ? { objectFit: 'contain', background: '#000' } : undefined} />
       ) : (
         <View style={styles.tileAvatar}>
-          <Lollipop name={tile.name} size={big ? 96 : 64} avatar={tile.avatar} />
+          <Lollipop name={tile.name} size={big || fill ? 96 : 64} avatar={tile.avatar} />
         </View>
       )}
       {/* Audio of others plays even when their tile shows an avatar. */}
@@ -41,6 +43,29 @@ export function ConferenceScreen() {
   const { me } = useMessenger();
   const { conf, invite, joining, error, canShareScreen, join, dismissInvite, leave, toggleMute, toggleCamera, toggleScreen, toggleScreenAudio } = useConference();
   const [now, setNow] = useState(Date.now());
+  const { width } = useWindowDimensions();
+  const [chatOpen, setChatOpen] = useState(false);
+  const [cinema, setCinema] = useState(false);
+  const unseen = useUnseen(conf?.info.chatId ?? 0, chatOpen || cinema);
+  const stageRef = useRef<View>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    if (!canFullscreen) return;
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
+  // Leaving the conference leaves fullscreen and resets the layout.
+  useEffect(() => {
+    if (conf) return;
+    setChatOpen(false);
+    setCinema(false);
+    if (canFullscreen && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }, [conf]);
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else ((stageRef.current as unknown as HTMLElement | null) ?? document.documentElement).requestFullscreen?.().catch(() => {});
+  }
   useEffect(() => {
     if (!conf) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -101,11 +126,16 @@ export function ConferenceScreen() {
 
   const count = tiles.length;
   const presenter = tiles.find((t) => t.screen);
-  const rest = presenter ? tiles.filter((t) => t !== presenter) : tiles;
+  // Cinema: one big picture (the screen being shown, or else the first person on video)
+  // with the chat beside it; everyone else in a strip below.
+  const featured = presenter ?? (cinema ? tiles.find((t) => !t.mine && t.showVideo) ?? tiles.find((t) => t.showVideo) : undefined);
+  const rest = featured ? tiles.filter((t) => t !== featured) : tiles;
+  const chatVisible = chatOpen || cinema;
+  const side = width >= 900; // chat to the right; on phones it goes below
 
   return (
-    <View style={styles.overlay}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+    <View style={styles.overlay} ref={stageRef}>
+      <View style={[styles.header, { paddingTop: fullscreen ? 8 : insets.top + 8 }]}>
         <Text style={styles.title} numberOfLines={1}>
           {conf.info.title}
         </Text>
@@ -114,16 +144,37 @@ export function ConferenceScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.grid}>
-        {presenter ? <TileView tile={presenter} big /> : null}
-        <View style={styles.row}>
-          {rest.map((t) => (
-            <TileView key={t.key} tile={t} big={!presenter && count <= 2} />
-          ))}
+      <View style={[styles.body, { flexDirection: side ? 'row' : 'column' }]}>
+        <View style={styles.stage}>
+          {featured ? (
+            <>
+              <TileView tile={featured} fill />
+              {rest.length ? (
+                <ScrollView horizontal style={styles.strip} contentContainerStyle={styles.stripRow}>
+                  {rest.map((t) => (
+                    <TileView key={t.key} tile={t} />
+                  ))}
+                </ScrollView>
+              ) : null}
+            </>
+          ) : (
+            <ScrollView contentContainerStyle={styles.grid}>
+              <View style={styles.row}>
+                {rest.map((t) => (
+                  <TileView key={t.key} tile={t} big={count <= 2 && !chatVisible} />
+                ))}
+              </View>
+            </ScrollView>
+          )}
         </View>
-      </ScrollView>
+        {chatVisible ? (
+          <View style={side ? styles.chatSide : styles.chatBottom}>
+            <ConfChat chatId={conf.info.chatId} onClose={() => (cinema ? setCinema(false) : setChatOpen(false))} />
+          </View>
+        ) : null}
+      </View>
 
-      <View style={[styles.controls, { paddingBottom: insets.bottom + 20 }]}>
+      <View style={[styles.controls, { paddingBottom: fullscreen ? 12 : insets.bottom + 14 }]}>
         <RoundButton glyph={conf.muted ? 'micOff' : 'mic'} label={conf.muted ? 'Микрофон выкл.' : 'Микрофон'} onPress={toggleMute} active={conf.muted} />
         {conf.info.video ? (
           <RoundButton glyph={conf.cameraOff ? 'camOff' : 'cam'} label={conf.cameraOff ? 'Камера выкл.' : 'Камера'} onPress={toggleCamera} active={conf.cameraOff} />
@@ -136,6 +187,11 @@ export function ConferenceScreen() {
             onPress={toggleScreenAudio}
             active={conf.screenAudio !== 'on'}
           />
+        ) : null}
+        <RoundButton glyph="chat" label="Чат" onPress={() => (cinema ? setCinema(false) : setChatOpen(!chatOpen))} active={chatVisible} badge={chatVisible ? 0 : unseen} />
+        <RoundButton glyph="cinema" label="Кинотеатр" onPress={() => setCinema(!cinema)} active={cinema} />
+        {canFullscreen ? (
+          <RoundButton glyph={fullscreen ? 'collapse' : 'expand'} label={fullscreen ? 'Свернуть' : 'На весь экран'} onPress={toggleFullscreen} active={fullscreen} />
         ) : null}
         <RoundButton glyph="hangup" label="Выйти" tone="red" onPress={leave} />
       </View>
@@ -201,6 +257,13 @@ const useStyles = makeStyles(({ fonts, colors, frames }) => ({
   title: { fontFamily: fonts.display, fontSize: 22, color: '#FFFFFF' },
   sub: { fontFamily: fonts.body, fontSize: 14, color: 'rgba(255,255,255,0.7)' },
   grid: { padding: 10, gap: 8, flexGrow: 1, justifyContent: 'center' },
+  body: { flex: 1, minHeight: 0, gap: 10, paddingHorizontal: 10 },
+  stage: { flex: 1, minHeight: 0, minWidth: 0, gap: 8 },
+  strip: { flexGrow: 0 },
+  stripRow: { gap: 8 },
+  tileFill: { flex: 1, minHeight: 160 },
+  chatSide: { width: 340 },
+  chatBottom: { height: '42%' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   tile: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#24213A' },
   tileBig: { width: '100%', maxWidth: 900, alignSelf: 'center' },
