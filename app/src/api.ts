@@ -13,6 +13,10 @@ export function setAuthToken(token: string | null) {
   authToken = token;
 }
 
+export function getAuthToken() {
+  return authToken;
+}
+
 // A Blob body is sent as is (photo upload); anything else as JSON.
 async function request<T>(path: string, body?: unknown): Promise<T> {
   let res: Response;

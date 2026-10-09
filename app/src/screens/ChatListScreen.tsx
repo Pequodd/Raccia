@@ -6,6 +6,7 @@ import { CandidateCard, InviteCard, ResultCard, VoteCard } from '../components/i
 import { Chrome, Icon, Lollipop, Plastic } from '../components/y2k';
 import { makeStyles, radius, useSkin } from '../skins';
 import { useState } from 'react';
+import { MEDIA_LABELS } from '../media/upload';
 import { useParts } from '../parts';
 import { useMessenger } from '../store';
 import type { Chat } from '../types';
@@ -70,7 +71,11 @@ export function ChatListScreen({
     let preview = 'Эфир пуст';
     if (t) preview = item.type === 'group' ? `${t.name} ${skin.copy.typing}` : skin.copy.typing;
     else if (last?.kind === 'service') preview = last.body;
-    else if (last) preview = (last.userId === me.id ? 'Я: ' : item.type === 'group' ? `${last.name}: ` : '') + last.body;
+    else if (last) {
+      const label = last.kind !== 'text' ? MEDIA_LABELS[last.kind] : null;
+      const text = label ? (last.body ? `${label} · ${last.body}` : label) : last.body;
+      preview = (last.userId === me.id ? 'Я: ' : item.type === 'group' ? `${last.name}: ` : '') + text;
+    }
     const ink = selected ? roles.selected.text : colors.nameText;
 
     if (parts.ChatRow) {

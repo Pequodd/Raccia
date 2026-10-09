@@ -25,7 +25,7 @@ case "${ID:-}" in ubuntu | debian) ;; *) die "Нужна Ubuntu или Debian, �
 say "1/7 Системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y curl git ca-certificates gnupg xz-utils debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y curl git ca-certificates gnupg xz-utils debian-keyring debian-archive-keyring apt-transport-https ffmpeg
 
 say "2/7 Подкачка (на маленьких серверах сборке веб-версии не хватает памяти)"
 if [ "$(free -m | awk '/^Mem:/{print $2}')" -lt 2000 ] && [ -z "$(swapon --show --noheadings)" ]; then

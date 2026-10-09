@@ -15,11 +15,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UserCard } from '../components/profile';
+import { CircleRecorder } from '../media/CircleRecorder';
+import { AttachPreview, AttachSheet, RecordingBar, ToolButton } from '../media/ComposerTools';
+import { MediaContent, type MediaView } from '../media/MediaViews';
+import { pickAttachment, PickError } from '../media/pick';
+import { mediaUrl } from '../media/upload';
+import { useVoiceRecorder } from '../media/useVoiceRecorder';
 import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../components/y2k';
 import { makeStyles, radius, useSkin } from '../skins';
 import { useParts } from '../parts';
 import { useMessenger } from '../store';
-import type { Message, PendingMessage } from '../types';
+import type { MediaDraft, Message, PendingMessage } from '../types';
 import { authorColor, clockTime, dayLabel, diagonal, plural } from '../y2k';
 
 type Row =
@@ -35,7 +41,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const { chats, messages, pending, me, typing, loadMessages, sendMessage, retryMessage, markRead, notifyTyping } =
+  const { chats, messages, pending, me, typing, loadMessages, sendMessage, sendMedia, retryMessage, markRead, notifyTyping } =
     useMessenger();
   const chat = chats.find((c) => c.id === chatId);
   const bucket = messages[chatId];
@@ -45,6 +51,13 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const [loadingOlder, setLoadingOlder] = useState(false);
   const parts = useParts();
   const [profileId, setProfileId] = useState<number | null>(null);
+  const [attaching, setAttaching] = useState(false);
+  const [draft, setDraft] = useState<MediaDraft | null>(null);
+  const [circling, setCircling] = useState(false);
+  const voice = useVoiceRecorder();
+  useEffect(() => {
+    if (voice.error) setError(voice.error);
+  }, [voice.error]);
 
   useEffect(() => {
     setText('');
@@ -117,6 +130,26 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
     sendMessage(chatId, body);
   }
 
+  async function pick(source: 'library' | 'camera') {
+    setError(null);
+    try {
+      const picked = await pickAttachment(source);
+      if (picked) setDraft(picked);
+    } catch (e) {
+      setError(e instanceof PickError ? e.message : 'Не получилось открыть файл. Попробуйте другой.');
+    }
+  }
+
+  async function startVoice() {
+    setError(null);
+    await voice.start();
+  }
+
+  async function sendVoice() {
+    const rec = await voice.stop();
+    if (rec) sendMedia(chatId, { kind: 'voice', uri: rec.uri, blob: rec.blob, mime: rec.mime, duration: rec.duration });
+  }
+
   function onKeyPress(e: NativeSyntheticEvent<TextInputKeyPressEventData>) {
     // Web: Enter sends, Shift+Enter inserts a newline.
     const ev = e.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean };
@@ -168,10 +201,20 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
             </View>
           </Bubble>
         );
-      case 'pending':
+      case 'pending': {
+        const draftMedia = item.item.media;
+        const uploading = item.item.failed ? undefined : (item.item.progress ?? 0);
+        if (draftMedia?.kind === 'circle' && !item.item.failed) {
+          return (
+            <View style={[styles.circleRow, { alignItems: 'flex-end' }]}>
+              <MediaContent media={draftMedia} mine progress={uploading} />
+            </View>
+          );
+        }
         return (
-          <Bubble mine tail failed={item.item.failed}>
-            <Text style={styles.textMine}>{item.item.body}</Text>
+          <Bubble mine tail failed={item.item.failed} media={!!draftMedia}>
+            {draftMedia ? <MediaContent media={draftMedia} mine progress={uploading} /> : null}
+            {item.item.body ? <Text style={[styles.textMine, draftMedia && styles.captionPad]}>{item.item.body}</Text> : null}
             {item.item.failed ? (
               <Pressable onPress={() => retryMessage(item.item)} style={styles.failRow} accessibilityRole="button">
                 <View style={styles.failMark}>
@@ -180,19 +223,44 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
                 <Text style={styles.failText}>{skin.copy.errorPrefix} Повторить</Text>
               </Pressable>
             ) : (
-              <Text style={styles.metaMine}>Передаём… · {clockTime(item.item.createdAt)}</Text>
+              <Text style={[styles.metaMine, draftMedia && styles.captionPad]}>Передаём… · {clockTime(item.item.createdAt)}</Text>
             )}
           </Bubble>
         );
+      }
       case 'message': {
         const m = item.message;
         const mine = m.userId === me.id;
+        const media: MediaView | null =
+          m.media && m.kind !== 'text' && m.kind !== 'service'
+            ? {
+                kind: m.kind,
+                uri: mediaUrl(m.media.file),
+                poster: m.media.poster ? mediaUrl(m.media.poster) : undefined,
+                width: m.media.width,
+                height: m.media.height,
+                duration: m.media.duration,
+              }
+            : null;
+        if (media?.kind === 'circle') {
+          return (
+            <View style={[styles.circleRow, { alignItems: mine ? 'flex-end' : 'flex-start' }]}>
+              {!mine && item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name, skin) }]}>{m.name}</Text> : null}
+              <MediaContent media={media} mine={mine} />
+              <Text style={styles.circleMeta}>
+                {mine ? `${skin.copy.ticks[ticksFor(m.id) - 1]} · ` : ''}
+                {clockTime(m.createdAt)}
+              </Text>
+            </View>
+          );
+        }
         if (mine) {
           const ticks = ticksFor(m.id);
           return (
-            <Bubble mine tail={item.tail}>
-              <Text style={styles.textMine}>{m.body}</Text>
-              <View style={styles.metaRow}>
+            <Bubble mine tail={item.tail} media={!!media}>
+              {media ? <MediaContent media={media} mine /> : null}
+              {m.body ? <Text style={[styles.textMine, media && styles.captionPad]}>{m.body}</Text> : null}
+              <View style={[styles.metaRow, media && styles.captionPad]}>
                 <Text style={styles.metaMine}>
                   {m.id === lastMine ? `${skin.copy.ticks[ticks - 1]} · ` : ''}
                   {clockTime(m.createdAt)}
@@ -203,10 +271,11 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
           );
         }
         return (
-          <Bubble mine={false} tail={item.tail}>
-            {item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name, skin) }]}>{m.name}</Text> : null}
-            <Text style={styles.textTheirs}>{m.body}</Text>
-            <Text style={styles.metaTheirs}>{clockTime(m.createdAt)}</Text>
+          <Bubble mine={false} tail={item.tail} media={!!media}>
+            {item.showAuthor ? <Text style={[styles.author, { color: authorColor(m.name, skin) }, media && styles.captionPad]}>{m.name}</Text> : null}
+            {media ? <MediaContent media={media} mine={false} /> : null}
+            {m.body ? <Text style={[styles.textTheirs, media && styles.captionPad]}>{m.body}</Text> : null}
+            <Text style={[styles.metaTheirs, media && styles.captionPad]}>{clockTime(m.createdAt)}</Text>
           </Bubble>
         );
       }
@@ -279,8 +348,24 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {parts.Composer ? (
+      <AttachSheet visible={attaching} onPick={pick} onClose={() => setAttaching(false)} />
+      <AttachPreview
+        draft={draft}
+        onClose={() => setDraft(null)}
+        onSend={(d) => {
+          setDraft(null);
+          sendMedia(chatId, d);
+        }}
+      />
+      <CircleRecorder visible={circling} onClose={() => setCircling(false)} onDone={(d) => sendMedia(chatId, d)} />
+
+      {voice.recording ? (
+        <RecordingBar elapsed={voice.elapsed} onCancel={voice.cancel} onSend={sendVoice} bottomInset={insets.bottom} />
+      ) : parts.Composer ? (
         <parts.Composer
+          onAttach={() => setAttaching(true)}
+          onMic={startVoice}
+          onCircle={() => setCircling(true)}
           value={text}
           onChange={(v) => {
             setText(v);
@@ -294,6 +379,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
       ) : (
       <Chrome style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           <View style={[styles.composerRow, wide && styles.feedWide]}>
+            <ToolButton icon="attach" label="Прикрепить фото или видео" onPress={() => setAttaching(true)} />
             <TextInput
               style={styles.input}
               placeholder={skin.copy.composer}
@@ -309,16 +395,22 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
               numberOfLines={Platform.OS === 'web' ? 1 : undefined}
               maxLength={4000}
             />
-            <Plastic
-              colors={roles.action.grad}
-              style={styles.send}
-              onPress={submit}
-              disabled={!text.trim()}
-              accessibilityLabel={skin.copy.send}
-              shadow="0 3px 8px rgba(0,112,138,0.35)"
-            >
-              <Text style={styles.sendText}>{skin.copy.send}</Text>
-            </Plastic>
+            {text.trim() ? (
+              <Plastic
+                colors={roles.action.grad}
+                style={styles.send}
+                onPress={submit}
+                accessibilityLabel={skin.copy.send}
+                shadow="0 3px 8px rgba(0,112,138,0.35)"
+              >
+                <Text style={styles.sendText}>{skin.copy.send}</Text>
+              </Plastic>
+            ) : (
+              <>
+                <ToolButton icon="mic" label="Записать голосовое" onPress={startVoice} />
+                <ToolButton icon="circle" label="Записать кружок" onPress={() => setCircling(true)} />
+              </>
+            )}
           </View>
         </Chrome>
       )}
@@ -330,11 +422,13 @@ function Bubble({
   mine,
   tail,
   failed,
+  media,
   children,
 }: {
   mine: boolean;
   tail: boolean;
   failed?: boolean;
+  media?: boolean; // an attachment: the picture goes almost edge to edge
   children: React.ReactNode;
 }) {
   const skin = useSkin();
@@ -355,6 +449,7 @@ function Bubble({
           shine ? (mine ? styles.bubbleMineShadow : styles.bubbleTheirsShadow) : { boxShadow: 'none' },
           look.border ? { borderWidth: 1, borderColor: look.border } : null,
           failed && styles.bubbleFailed,
+          media && styles.bubbleMedia,
         ]}
       >
         <View style={[StyleSheet.absoluteFill, corners, { overflow: 'hidden' }]} pointerEvents="none">
@@ -409,6 +504,10 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   },
   dayText: { fontFamily: fonts.mono, fontSize: 11, color: colors.text2 },
   bubbleRow: { flexDirection: 'row', flexShrink: 0 },
+  bubbleMedia: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 5 },
+  captionPad: { paddingHorizontal: 8 },
+  circleRow: { gap: 3, flexShrink: 0 },
+  circleMeta: { fontFamily: fonts.mono, fontSize: 11, color: colors.text3, paddingHorizontal: 8 },
   bubble: { maxWidth: '80%', paddingHorizontal: 13, paddingTop: 8, paddingBottom: 6, flexShrink: 0 },
   bubbleShine: { position: 'absolute', left: 0, right: 0, top: 0, height: 12 },
   bubbleInset: {

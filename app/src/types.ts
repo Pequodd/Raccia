@@ -17,14 +17,32 @@ export type Me = Profile & { isAdmin: boolean; onboarded: boolean; push: boolean
 
 export type Member = User & { online: boolean; lastReadId: number; lastDeliveredId: number };
 
+export type MediaKind = 'image' | 'video' | 'voice' | 'circle';
+
+// An attachment on the server: file is a path under /media.
+export type Media = { file: string; poster?: string; size: number; width: number | null; height: number | null; duration: number | null };
+
 export type Message = {
   id: number;
   chatId: number;
   userId: number;
-  kind: 'text' | 'service';
+  kind: 'text' | 'service' | MediaKind;
+  media: Media | null;
   name: string;
-  body: string;
+  body: string; // text, or the caption of an attachment
   createdAt: number;
+};
+
+// An attachment on its way: shown at once from the local file.
+export type MediaDraft = {
+  kind: MediaKind;
+  uri: string; // local file or blob: URL, for the preview
+  blob?: Blob; // web: the file itself
+  mime: string;
+  width?: number;
+  height?: number;
+  duration?: number; // ms
+  caption?: string;
 };
 
 export type Chat = {
@@ -72,4 +90,6 @@ export type PendingMessage = {
   body: string;
   createdAt: number;
   failed: boolean;
+  media?: MediaDraft;
+  progress?: number; // 0..1 while uploading
 };

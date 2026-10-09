@@ -48,6 +48,9 @@ export type ComposerProps = {
   onChange: (v: string) => void;
   onSend: () => void;
   onKeyPress: (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => void;
+  onAttach: () => void; // photo / video
+  onMic: () => void; // start a voice message
+  onCircle: () => void; // record a video circle
   wide: boolean;
   bottomInset: number;
 };

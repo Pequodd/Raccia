@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { AppState, Platform } from 'react-native';
 import { api } from './api';
 import { Socket } from './socket';
-import type { Chat, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
+import { uploadMedia } from './media/upload';
+import type { Chat, MediaDraft, Me, Message, PendingMessage, ServerEvent, Vote, VoteResult } from './types';
 
 type ChatMessages = { items: Message[]; hasMore: boolean; loaded: boolean };
 
@@ -26,6 +27,7 @@ type Action =
   | { type: 'pendingAdd'; item: PendingMessage }
   | { type: 'pendingFail'; chatId: number; tempId: string; failed: boolean }
   | { type: 'pendingDrop'; chatId: number; tempId: string }
+  | { type: 'pendingProgress'; chatId: number; tempId: string; progress: number }
   | { type: 'typing'; chatId: number; name: string }
   | { type: 'votes'; votes: Vote[] }
   | { type: 'vote'; vote: Vote }
@@ -127,6 +129,13 @@ function reducer(state: State, action: Action): State {
       return { ...state, pending: { ...state.pending, [action.chatId]: list } };
     }
 
+    case 'pendingProgress': {
+      const list = (state.pending[action.chatId] ?? []).map((p) =>
+        p.tempId === action.tempId ? { ...p, progress: action.progress } : p
+      );
+      return { ...state, pending: { ...state.pending, [action.chatId]: list } };
+    }
+
     case 'pendingDrop': {
       const list = (state.pending[action.chatId] ?? []).filter((p) => p.tempId !== action.tempId);
       return { ...state, pending: { ...state.pending, [action.chatId]: list } };
@@ -199,6 +208,7 @@ type Messenger = State & {
   setActiveChat: (chatId: number | null) => void;
   loadMessages: (chatId: number, older?: boolean) => Promise<void>;
   sendMessage: (chatId: number, body: string) => void;
+  sendMedia: (chatId: number, draft: MediaDraft) => void;
   retryMessage: (item: PendingMessage) => void;
   markRead: (chatId: number) => void;
   notifyTyping: (chatId: number) => void;
@@ -362,7 +372,13 @@ export function MessengerProvider({
   const deliver = useCallback(async (item: PendingMessage) => {
     dispatch({ type: 'pendingFail', chatId: item.chatId, tempId: item.tempId, failed: false });
     try {
-      const { message } = await api.send(item.chatId, item.body);
+      const { message } = item.media
+        ? {
+            message: await uploadMedia(item.chatId, item.media, (progress) =>
+              dispatch({ type: 'pendingProgress', chatId: item.chatId, tempId: item.tempId, progress })
+            ),
+          }
+        : await api.send(item.chatId, item.body);
       dispatch({ type: 'message', message, me: me.id, activeChatId: activeRef.current });
       dispatch({ type: 'pendingDrop', chatId: item.chatId, tempId: item.tempId });
     } catch {
@@ -382,6 +398,21 @@ export function MessengerProvider({
     deliver(item);
     // The recipient's typing indicator clears on our message; let the next keystroke re-announce it.
     lastTypingSent.current = 0;
+  }, [deliver]);
+
+  // Photo, video, voice or circle: shown at once from the local file, uploaded in the background.
+  const sendMedia = useCallback((chatId: number, draft: MediaDraft) => {
+    const item: PendingMessage = {
+      tempId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      chatId,
+      body: draft.caption ?? '',
+      createdAt: Date.now(),
+      failed: false,
+      media: draft,
+      progress: 0,
+    };
+    dispatch({ type: 'pendingAdd', item });
+    deliver(item);
   }, [deliver]);
 
   const notifyTyping = useCallback((chatId: number) => {
@@ -416,13 +447,14 @@ export function MessengerProvider({
       setActiveChat,
       loadMessages,
       sendMessage,
+      sendMedia,
       retryMessage: deliver,
       markRead,
       notifyTyping,
       openDirect,
       createGroup,
     }),
-    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, deliver, markRead, notifyTyping, openDirect, createGroup]
+    [state, me, incoming, dismissIncoming, castVote, dismissResult, activeChatId, setActiveChat, loadMessages, sendMessage, sendMedia, deliver, markRead, notifyTyping, openDirect, createGroup]
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

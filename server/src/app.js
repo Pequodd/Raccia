@@ -6,6 +6,7 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import { hashPassword, verifyPassword, newToken } from './auth.js';
 import { createPush } from './push.js';
+import { MediaError, saveMedia } from './media.js';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 const MAX_MESSAGE_LENGTH = 4000;
@@ -13,6 +14,9 @@ const MAX_PAGE = 100;
 const MAX_NAME_LENGTH = 32;
 const MAX_BIO_LENGTH = 140;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
+const MAX_CAPTION_LENGTH = 1000;
+// How an attachment reads in a push and in the chat list.
+export const MEDIA_LABELS = { image: '📷 Фото', video: '🎬 Видео', voice: '🎤 Голосовое', circle: '⭕ Кружок' };
 const VOTE_MS = 5 * 60_000;
 
 // Sticker ids a user may pick as an avatar (app/assets/stickers/webp).
@@ -104,7 +108,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       SELECT c.id, c.type, c.title, c.created_at, cm.last_read_id,
         (SELECT MAX(id) FROM messages m WHERE m.chat_id = c.id) AS last_message_id,
         (SELECT COUNT(*) FROM messages m
-          WHERE m.chat_id = c.id AND m.id > cm.last_read_id AND m.user_id != cm.user_id AND m.kind = 'text') AS unread
+          WHERE m.chat_id = c.id AND m.id > cm.last_read_id AND m.user_id != cm.user_id AND m.kind != 'service') AS unread
       FROM chats c JOIN chat_members cm ON cm.chat_id = c.id
       WHERE cm.user_id = ?
     `),
@@ -112,7 +116,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       SELECT c.id, c.type, c.title, c.created_at, cm.last_read_id,
         (SELECT MAX(id) FROM messages m WHERE m.chat_id = c.id) AS last_message_id,
         (SELECT COUNT(*) FROM messages m
-          WHERE m.chat_id = c.id AND m.id > cm.last_read_id AND m.user_id != cm.user_id AND m.kind = 'text') AS unread
+          WHERE m.chat_id = c.id AND m.id > cm.last_read_id AND m.user_id != cm.user_id AND m.kind != 'service') AS unread
       FROM chats c JOIN chat_members cm ON cm.chat_id = c.id
       WHERE cm.user_id = ? AND c.id = ?
     `),
@@ -126,17 +130,17 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     insertChat: db.prepare('INSERT INTO chats (type, title, direct_key, created_at) VALUES (?, ?, ?, ?)'),
     insertMember: db.prepare('INSERT OR IGNORE INTO chat_members (chat_id, user_id) VALUES (?, ?)'),
     messageById: db.prepare(`
-      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.created_at
+      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.media, m.created_at
       FROM messages m JOIN users u ON u.id = m.user_id WHERE m.id = ?
     `),
     messagesPage: db.prepare(`
-      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.created_at
+      SELECT m.id, m.chat_id, m.user_id, m.kind, ${NAME_SQL} AS name, m.body, m.media, m.created_at
       FROM messages m JOIN users u ON u.id = m.user_id
       WHERE m.chat_id = ? AND m.id < ?
       ORDER BY m.id DESC LIMIT ?
     `),
     insertMessage: db.prepare(
-      'INSERT INTO messages (chat_id, user_id, body, created_at, kind) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO messages (chat_id, user_id, body, created_at, kind, media) VALUES (?, ?, ?, ?, ?, ?)'
     ),
     markRead: db.prepare(
       'UPDATE chat_members SET last_read_id = MAX(last_read_id, ?1), last_delivered_id = MAX(last_delivered_id, ?1) WHERE chat_id = ?2 AND user_id = ?3'
@@ -201,6 +205,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       chatId: row.chat_id,
       userId: row.user_id,
       kind: row.kind,
+      media: row.media ? JSON.parse(row.media) : null,
       name: row.name,
       body: row.body,
       createdAt: row.created_at,
@@ -261,15 +266,19 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     for (const uid of memberIds(chatId)) send(uid, { type: 'delivered', chatId, userId, messageId });
   }
 
-  function postMessage(chatId, userId, body, kind = 'text') {
-    const id = Number(q.insertMessage.run(chatId, userId, body, Date.now(), kind).lastInsertRowid);
-    if (kind === 'text') q.markRead.run(id, chatId, userId);
+  function postMessage(chatId, userId, body, kind = 'text', media = null) {
+    const id = Number(
+      q.insertMessage.run(chatId, userId, body, Date.now(), kind, media ? JSON.stringify(media) : null).lastInsertRowid
+    );
+    if (kind !== 'service') q.markRead.run(id, chatId, userId);
     const message = messageView(q.messageById.get(id));
     const members = memberIds(chatId);
     for (const uid of members) send(uid, { type: 'message', message });
     for (const uid of members) if (uid !== userId && isOnline(uid)) markDelivered(chatId, uid, id);
     const chat = q.chatInfo.get(chatId);
-    const text = body.length > 180 ? body.slice(0, 180) + '…' : body;
+    const label = MEDIA_LABELS[kind];
+    const caption = body.length > 180 ? body.slice(0, 180) + '…' : body;
+    const text = label ? (caption ? `${label} · ${caption}` : label) : caption;
     for (const uid of members) {
       if (uid === userId || isWatching(uid)) continue;
       push.notify(uid, {
@@ -653,6 +662,35 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     if (!body) return res.status(400).json({ error: 'Пустое сообщение' });
     if (body.length > MAX_MESSAGE_LENGTH) return res.status(400).json({ error: 'Слишком длинное сообщение' });
     res.status(201).json({ message: postMessage(req.chatId, req.user.id, body) });
+  });
+
+  // Photo, video, voice or circle: the file is the request body, the rest goes in the query.
+  //   POST /api/chats/12/media?kind=voice&duration=4200   (Content-Type: audio/mp4)
+  app.post('/api/chats/:id/media', requireAuth, requireMember, async (req, res) => {
+    if (!uploadDir) return res.status(503).json({ error: 'Вложения отключены' });
+    const kind = String(req.query.kind ?? '');
+    const caption = typeof req.query.caption === 'string' ? req.query.caption.trim() : '';
+    if (caption.length > MAX_CAPTION_LENGTH) return res.status(400).json({ error: 'Слишком длинная подпись' });
+    const num = (v, max) => {
+      const n = Math.round(Number(v));
+      return Number.isFinite(n) && n > 0 && n <= max ? n : null;
+    };
+    let saved;
+    try {
+      saved = await saveMedia(req, uploadDir, kind);
+    } catch (err) {
+      if (err instanceof MediaError) return res.status(err.status).json({ error: err.message });
+      throw err;
+    }
+    const { probedDuration, ...file } = saved;
+    const media = {
+      ...file,
+      width: num(req.query.width, 20000),
+      height: num(req.query.height, 20000),
+      // The file knows best; the sender's number is the fallback (ms).
+      duration: probedDuration ?? num(req.query.duration, 6 * 3600_000),
+    };
+    res.status(201).json({ message: postMessage(req.chatId, req.user.id, caption, kind, media) });
   });
 
   app.post('/api/chats/:id/read', requireAuth, requireMember, (req, res) => {

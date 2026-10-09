@@ -26,7 +26,29 @@
     "scheme": "oleg",
     "plugins": [
       "expo-font",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Олег откроет галерею, чтобы вы отправили фото или видео и поставили фото в профиль.",
+          "cameraPermission": "Олег включит камеру, чтобы снять фото, видео или кружок."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Олег включит камеру, чтобы снять фото, видео или кружок.",
+          "microphonePermission": "Олег включит микрофон, чтобы записать голосовое или кружок.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Олег включит микрофон, чтобы записать голосовое или кружок."
+        }
+      ],
+      "expo-video"
     ]
   }
 }
