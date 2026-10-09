@@ -8,6 +8,7 @@ const amber = { grad: ['#FFC84A', '#E08A00'] as const, text: '#2A1600' };
 const yes = { grad: ['#5CE06A', '#1F9A2E'] as const, text: '#062A0A' };
 const metal = { grad: ['#5A6075', '#3A3E4E'] as const, text };
 const lcd = { grad: ['#0A140B', '#050805'] as const, text: '#3CFF5A' };
+const chip = { grad: ['#4E5366', '#2E313D'] as const, text };
 
 const bevel: Frame = {
   borderWidth: 1,
@@ -45,6 +46,8 @@ export const winamp: Skin = {
     accentText: '#3CFF5A',
     nameText: '#3CFF5A',
     focus: '#F2A51A',
+    focusGlow: 'rgba(242,165,26,0.2)',
+    voteTitle: '#F2A51A',
     labelText: '#F2A51A',
     serviceText: '#9AA0B4',
     serviceBg: 'rgba(255,255,255,0.04)',
@@ -78,9 +81,9 @@ export const winamp: Skin = {
     cta: amber,
     action: amber,
     round: amber,
-    chipNew: metal,
-    chipInvite: metal,
-    chipGroup: metal,
+    chipNew: chip,
+    chipInvite: chip,
+    chipGroup: chip,
     positive: yes,
     negative: metal,
     danger: { grad: ['#FF6A6A', '#C41A1A'], text: '#FFFFFF' },
@@ -96,7 +99,7 @@ export const winamp: Skin = {
     shine: false,
   },
   ball: ['#050805', '#050805'],
-  stickerAvatar: ['#2C2F3B', '#1B1D25'],
+  stickerAvatar: ['#050805', '#050805'],
   chrome: { colors: ['#454A5C', '#2C2F3B'], locations: [0, 1] },
   logoChrome: [
     { offset: 0, color: '#FFE08A' },
@@ -120,7 +123,9 @@ export const winamp: Skin = {
     bodyBold: 'PTSans_700Bold',
     bodyHeavy: 'PTSans_700Bold',
     mono: 'PTMono_400Regular',
+    field: 'PTMono_400Regular',
   },
+  vote: { meta: 'mono', bar: 'segments', buttonFont: 'display' },
   copy: {
     ...y2k.copy,
     slogan: 'Ненациональный мессенджер «Олег».\nТолько для своих, по инвайту.',

@@ -50,6 +50,8 @@ export type Skin = {
     accentText: string; // links, subtitles («в сети», «передаёт сигнал…»)
     nameText: string; // chat names in the list
     focus: string;
+    focusGlow: string; // ring around a focused field
+    voteTitle: string; // «НОВЫЙ АБОНЕНТ!»
     labelText: string; // field labels, inviter line
     serviceText: string;
     serviceBg: string;
@@ -114,7 +116,8 @@ export type Skin = {
   background: { kind: BackgroundKind; gradient: Gradient; line: string };
   avatars: Gradient[];
   authorColors: string[]; // names in group bubbles
-  fonts: { display: string; body: string; bodyBold: string; bodyHeavy: string; mono: string };
+  fonts: { display: string; body: string; bodyBold: string; bodyHeavy: string; mono: string; field: string };
+  vote: { meta: 'mono' | 'body'; bar: 'smooth' | 'segments'; buttonFont: 'display' | 'bodyHeavy' };
   copy: Copy;
 };
 

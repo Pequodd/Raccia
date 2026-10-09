@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { makeStyles, useSkin } from '../skins';
 import { stickers } from './y2k';
 
@@ -39,11 +39,11 @@ function Equalizer({ height }: { height: number }) {
   return (
     <View style={[styles.eq, { height }]}>
       {levels.map((v, i) => (
-        <View key={i} style={[styles.eqBar, { height: Math.round(v * (height - 6)) }]}>
+        <View key={i} style={[styles.eqBar, { height: Math.round(v * (height - 8)) }]}>
           <LinearGradient
-            colors={['#FF3B3B', '#F2D21A', '#2ECC40']}
-            locations={[0, 0.2, 0.45]}
-            style={[styles.eqFill, { height: height - 6 }]}
+            colors={['#FF3B3B', '#FF3B3B', '#F2D21A', '#F2D21A', '#2ECC40', '#2ECC40']}
+            locations={[0, 0.2, 0.2, 0.45, 0.45, 1]}
+            style={[styles.eqFill, { height: height - 8 }]}
           />
         </View>
       ))}
@@ -86,6 +86,7 @@ export function PlayerHero() {
   const styles = useStyles();
   return (
     <View style={styles.player}>
+      <LinearGradient colors={skin.chrome.colors} locations={skin.chrome.locations} style={StyleSheet.absoluteFill} />
       <TitleStrip title={skin.copy.heroTitle ?? 'ОЛЕГ'} />
       <View style={styles.playerBody}>
         <View style={styles.cover}>
@@ -100,7 +101,7 @@ export function PlayerHero() {
             <Text style={styles.tag}>44</Text>
             <Text style={styles.tagLabel}>кгц</Text>
           </View>
-          <Equalizer height={58} />
+          <Equalizer height={60} />
         </View>
       </View>
     </View>
@@ -108,6 +109,7 @@ export function PlayerHero() {
 }
 
 const useStyles = makeStyles(({ colors, fonts, chrome, frames }) => ({
+  // Sizes from W01 in docs/design/retro/oleg-winamp.dc.html.
   strip: { height: 20, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
   grip: { flex: 1, height: 7, justifyContent: 'space-between' },
   gripLine: { height: 1, backgroundColor: '#D9B44A' },
@@ -116,13 +118,13 @@ const useStyles = makeStyles(({ colors, fonts, chrome, frames }) => ({
     backgroundColor: chrome.colors[0],
     ...frames.panel,
   },
-  playerBody: { flexDirection: 'row', gap: 8, padding: 8, paddingTop: 2 },
-  cover: { width: 112, height: 112, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden' },
-  coverImage: { position: 'absolute', width: 124, height: 124, left: -6, top: 0 },
-  coverTime: { position: 'absolute', left: 4, top: 3, fontFamily: fonts.mono, fontSize: 10, color: colors.lcdText },
-  playerRight: { flex: 1, gap: 6 },
-  marquee: { height: 22, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden', justifyContent: 'center' },
-  marqueeText: { position: 'absolute', left: 0, top: 3, flexShrink: 0, fontFamily: fonts.mono, fontSize: 11, color: colors.lcdText },
+  playerBody: { flexDirection: 'row', gap: 10, padding: 10 },
+  cover: { width: 150, height: 150, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden' },
+  coverImage: { position: 'absolute', width: 150, height: 150, left: 0, bottom: -14 },
+  coverTime: { position: 'absolute', left: 6, top: 4, fontFamily: fonts.mono, fontSize: 10, color: colors.lcdText },
+  playerRight: { flex: 1, gap: 8, minWidth: 0 },
+  marquee: { height: 28, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden', justifyContent: 'center' },
+  marqueeText: { position: 'absolute', left: 8, top: 6, flexShrink: 0, fontFamily: fonts.mono, fontSize: 12, color: colors.lcdText },
   tags: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tag: {
     fontFamily: fonts.mono,
@@ -138,8 +140,8 @@ const useStyles = makeStyles(({ colors, fonts, chrome, frames }) => ({
     ...frames.field,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 2,
-    padding: 3,
+    gap: 3,
+    padding: 4,
   },
   eqBar: { flex: 1, overflow: 'hidden', justifyContent: 'flex-end' },
   eqFill: { width: '100%' },

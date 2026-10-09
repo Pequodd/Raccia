@@ -22,6 +22,8 @@ export const y2k: Skin = {
     accentText: '#00708A',
     nameText: '#1B1530',
     focus: '#00AACD',
+    focusGlow: 'rgba(0,170,205,0.2)',
+    voteTitle: white,
     labelText: '#5A2FA8',
     serviceText: '#3E1F80',
     serviceBg: 'rgba(123,75,200,0.14)',
@@ -105,7 +107,9 @@ export const y2k: Skin = {
     bodyBold: 'Nunito_700Bold',
     bodyHeavy: 'Nunito_800ExtraBold',
     mono: 'PTMono_400Regular',
+    field: 'Nunito_700Bold',
   },
+  vote: { meta: 'body', bar: 'smooth', buttonFont: 'bodyHeavy' },
   copy: {
     slogan: 'Ненациональный мессенджер Олег',
     promise: 'БЕЗ ЦЕНЗУРЫ\nИ БЛОКИРОВОК РКН!',

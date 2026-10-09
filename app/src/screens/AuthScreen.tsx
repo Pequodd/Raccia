@@ -220,7 +220,7 @@ export function AuthScreen({
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, shape }) => ({
   root: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 26, justifyContent: 'center' },
   column: { width: '100%', maxWidth: 360, alignSelf: 'center', alignItems: 'stretch' },
@@ -264,7 +264,7 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
     borderWidth: 1,
     borderColor: colors.fieldBorder,
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.12)',
-    fontFamily: fonts.bodyBold,
+    fontFamily: fonts.field,
     fontSize: 17,
     color: colors.fieldText,
     outlineWidth: 0,
@@ -274,9 +274,19 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
     backgroundColor: colors.fieldFocus,
     borderWidth: 2,
     borderColor: colors.focus,
-    boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.12), 0 0 0 4px rgba(0,170,205,0.2)',
+    borderTopColor: colors.focus,
+    borderLeftColor: colors.focus,
+    borderRightColor: colors.focus,
+    borderBottomColor: colors.focus,
+    boxShadow: `inset 0 2px 4px rgba(27,21,48,0.12), 0 0 0 4px ${colors.focusGlow}`,
   },
-  inputError: { borderColor: colors.dangerBorder },
+  inputError: {
+    borderColor: colors.dangerBorder,
+    borderTopColor: colors.dangerBorder,
+    borderLeftColor: colors.dangerBorder,
+    borderRightColor: colors.dangerBorder,
+    borderBottomColor: colors.dangerBorder,
+  },
   problem: {
     marginTop: 16,
     borderRadius: 16,
@@ -293,7 +303,7 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
     fontFamily: fonts.display,
     fontSize: 20,
     color: roles.cta.text,
-    textShadowColor: 'rgba(130,50,0,0.7)',
+    textShadowColor: shape.kind === 'glossy' ? 'rgba(130,50,0,0.7)' : 'transparent',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },

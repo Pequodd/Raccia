@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../components/y2k';
 import { makeStyles, radius, useSkin } from '../skins';
+import { useParts } from '../parts';
 import { useMessenger } from '../store';
 import type { Message, PendingMessage } from '../types';
 import { authorColor, clockTime, dayLabel, diagonal, plural } from '../y2k';
@@ -41,6 +42,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const parts = useParts();
 
   useEffect(() => {
     setText('');
@@ -134,6 +136,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   function renderRow({ item }: { item: Row }) {
     switch (item.kind) {
       case 'day':
+        if (parts.DayPill) return <parts.DayPill label={item.label} />;
         return (
           <View style={styles.dayRow}>
             <Chrome style={styles.dayPill}>
@@ -142,6 +145,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
           </View>
         );
       case 'service':
+        if (parts.Service) return <parts.Service text={item.message.body} />;
         return (
           <View style={styles.serviceRow}>
             <View style={styles.service}>
@@ -150,6 +154,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
           </View>
         );
       case 'typing':
+        if (parts.Typing) return <parts.Typing name={item.name} group={chat!.type === 'group'} />;
         return (
           <Bubble mine={false} tail>
             {chat!.type === 'group' ? <Text style={[styles.author, { color: authorColor(item.name, skin) }]}>{item.name}</Text> : null}
@@ -207,24 +212,36 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {parts.ChatHeader ? (
+        <parts.ChatHeader
+          title={chat.title}
+          subtitle={subtitle}
+          avatar={other?.avatar ?? null}
+          online={!!other?.online}
+          onBack={wide ? undefined : onBack}
+          wide={wide}
+          topInset={insets.top}
+        />
+      ) : (
       <Chrome style={[styles.header, { paddingTop: wide ? 0 : insets.top }]}>
-        <View style={[styles.headerRow, wide && styles.headerRowWide]}>
-          {wide ? (
-            <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />
-          ) : (
-            <ChromeButton size={38} onPress={onBack ?? (() => {})} label="Назад" icon={<Icon name="back" size={18} />} />
-          )}
-          <View style={[styles.headerTitles, wide && { alignItems: 'flex-start' }]}>
-            <Text numberOfLines={1} style={styles.headerTitle}>
-              {chat.title}
-            </Text>
-            <Text numberOfLines={1} style={styles.headerSubtitle}>
-              {subtitle}
-            </Text>
+          <View style={[styles.headerRow, wide && styles.headerRowWide]}>
+            {wide ? (
+              <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />
+            ) : (
+              <ChromeButton size={38} onPress={onBack ?? (() => {})} label="Назад" icon={<Icon name="back" size={18} />} />
+            )}
+            <View style={[styles.headerTitles, wide && { alignItems: 'flex-start' }]}>
+              <Text numberOfLines={1} style={styles.headerTitle}>
+                {chat.title}
+              </Text>
+              <Text numberOfLines={1} style={styles.headerSubtitle}>
+                {subtitle}
+              </Text>
+            </View>
+            {wide ? null : <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />}
           </View>
-          {wide ? null : <Lollipop name={chat.title} size={38} online={other?.online} avatar={other?.avatar} />}
-        </View>
-      </Chrome>
+        </Chrome>
+      )}
 
       <FlatList
         inverted
@@ -247,35 +264,49 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      {parts.Composer ? (
+        <parts.Composer
+          value={text}
+          onChange={(v) => {
+            setText(v);
+            if (v) notifyTyping(chatId);
+          }}
+          onSend={submit}
+          onKeyPress={onKeyPress}
+          wide={wide}
+          bottomInset={insets.bottom}
+        />
+      ) : (
       <Chrome style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-        <View style={[styles.composerRow, wide && styles.feedWide]}>
-          <TextInput
-            style={styles.input}
-            placeholder={skin.copy.composer}
-            placeholderTextColor={colors.placeholder}
-            value={text}
-            onChangeText={(v) => {
-              setText(v);
-              if (v) notifyTyping(chatId);
-            }}
-            onKeyPress={onKeyPress}
-            multiline
-            // Browsers default a textarea to two rows; start at one like the native field.
-            numberOfLines={Platform.OS === 'web' ? 1 : undefined}
-            maxLength={4000}
-          />
-          <Plastic
-            colors={roles.action.grad}
-            style={styles.send}
-            onPress={submit}
-            disabled={!text.trim()}
-            accessibilityLabel={skin.copy.send}
-            shadow="0 3px 8px rgba(0,112,138,0.35)"
-          >
-            <Text style={styles.sendText}>{skin.copy.send}</Text>
-          </Plastic>
-        </View>
-      </Chrome>
+          <View style={[styles.composerRow, wide && styles.feedWide]}>
+            <TextInput
+              style={styles.input}
+              placeholder={skin.copy.composer}
+              placeholderTextColor={colors.placeholder}
+              value={text}
+              onChangeText={(v) => {
+                setText(v);
+                if (v) notifyTyping(chatId);
+              }}
+              onKeyPress={onKeyPress}
+              multiline
+              // Browsers default a textarea to two rows; start at one like the native field.
+              numberOfLines={Platform.OS === 'web' ? 1 : undefined}
+              maxLength={4000}
+            />
+            <Plastic
+              colors={roles.action.grad}
+              style={styles.send}
+              onPress={submit}
+              disabled={!text.trim()}
+              accessibilityLabel={skin.copy.send}
+              shadow="0 3px 8px rgba(0,112,138,0.35)"
+            >
+              <Text style={styles.sendText}>{skin.copy.send}</Text>
+            </Plastic>
+          </View>
+        </Chrome>
+      )}
     </KeyboardAvoidingView>
   );
 }

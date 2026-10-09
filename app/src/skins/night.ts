@@ -16,6 +16,7 @@ export const night: Skin = {
     placeholder: '#7D7699',
     accentText: '#3FD8F5',
     focus: '#3FD8F5',
+    focusGlow: 'rgba(63,216,245,0.25)',
     labelText: '#B99BFF',
     serviceText: '#D8CCFF',
     serviceBg: 'rgba(165,123,232,0.22)',

@@ -42,18 +42,20 @@ function GrapeCard({ children }: { children: React.ReactNode }) {
 
 function Tally({ vote }: { vote: Vote }) {
   const skin = useSkin();
-  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const total = vote.yes + vote.no + vote.thinking || 1;
+  const segments = skin.vote.bar === 'segments';
   return (
     <>
-      <View style={styles.bar}>
-        <View style={[styles.barYes, { flex: vote.yes / total }]} />
-        <View style={[styles.barNo, { flex: vote.no / total }]} />
-        <View style={{ flex: vote.thinking / total }} />
+      <View style={segments ? styles.barSegments : styles.bar}>
+        {vote.yes ? <View style={[styles.barYes, { flex: vote.yes / total }]} /> : null}
+        {vote.thinking ? <View style={[segments ? styles.barThinking : null, { flex: vote.thinking / total }]} /> : null}
+        {vote.no ? <View style={[styles.barNo, { flex: vote.no / total }]} /> : null}
       </View>
       <Text style={styles.tally}>
-        Впустить: {vote.yes} · Отключить: {vote.no} · Думают: {vote.thinking}
+        {segments
+          ? `${skin.copy.voteFor.replace(/^[^\p{L}]+/u, '')} ${vote.yes} · ${skin.copy.voteAgainst.replace(/^[^\p{L}]+/u, '')} ${vote.no} · Думают ${vote.thinking}`
+          : `Впустить: ${vote.yes} · Отключить: ${vote.no} · Думают: ${vote.thinking}`}
       </Text>
     </>
   );
@@ -226,7 +228,7 @@ export function InviteCard({ onClose }: { onClose: () => void }) {
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, vote }) => ({
   card: {
     borderRadius: 20,
     paddingHorizontal: 14,
@@ -239,19 +241,21 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   cardClip: { borderRadius: 20, overflow: 'hidden' },
   cardShine: { position: 'absolute', left: 0, right: 0, top: 0, height: '40%' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontFamily: fonts.display, fontSize: 16, color: roles.vote.text },
+  title: { fontFamily: fonts.display, fontSize: 16, color: colors.voteTitle },
   close: { color: roles.vote.text, fontFamily: fonts.bodyHeavy, fontSize: 16 },
   candidate: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   candidateName: { fontFamily: fonts.bodyHeavy, fontSize: 15, color: roles.vote.text },
-  candidateMeta: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  candidateMeta: { fontFamily: vote.meta === 'mono' ? fonts.mono : fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   bar: { height: 8, borderRadius: 4, flexDirection: 'row', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.25)' },
+  barSegments: { height: 10, flexDirection: 'row', gap: 2, padding: 2, backgroundColor: colors.lcdBg },
+  barThinking: { backgroundColor: '#2A2F3A' },
   barYes: { backgroundColor: colors.neon, boxShadow: `0 0 6px ${colors.neonGlow}` },
   barNo: { backgroundColor: colors.voteNo },
-  tally: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.9)' },
+  tally: { fontFamily: vote.meta === 'mono' ? fonts.mono : fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.9)' },
   note: { fontFamily: fonts.bodyBold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   buttons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   button: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: roles.action.text },
+  buttonText: { fontFamily: vote.buttonFont === 'display' ? fonts.display : fonts.bodyHeavy, fontSize: vote.buttonFont === 'display' ? 15 : 14, color: roles.action.text },
   myVote: { flex: 1, fontFamily: fonts.bodyHeavy, fontSize: 14, color: roles.vote.text },
   error: { fontFamily: fonts.bodyBold, fontSize: 12, color: '#FFC6F2' },
   linkBox: {

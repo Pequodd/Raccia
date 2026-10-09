@@ -6,6 +6,7 @@ import { CandidateCard, InviteCard, ResultCard, VoteCard } from '../components/i
 import { Chrome, Icon, Lollipop, Plastic } from '../components/y2k';
 import { makeStyles, radius, useSkin } from '../skins';
 import { useState } from 'react';
+import { useParts } from '../parts';
 import { useMessenger } from '../store';
 import type { Chat } from '../types';
 import { diagonal, formatTime } from '../y2k';
@@ -59,8 +60,9 @@ export function ChatListScreen({
   const visible = filterChats(chats, query);
   const [inviting, setInviting] = useState(false);
   const otherVotes = Object.values(votes).filter((v) => v.candidate.id !== me.id);
+  const parts = useParts();
 
-  function renderItem({ item }: { item: Chat }) {
+  function renderItem({ item, index }: { item: Chat; index: number }) {
     const other = item.type === 'direct' ? item.members.find((m) => m.id !== me.id) : undefined;
     const selected = wide && item.id === activeChatId;
     const t = typing[item.id];
@@ -70,6 +72,24 @@ export function ChatListScreen({
     else if (last?.kind === 'service') preview = last.body;
     else if (last) preview = (last.userId === me.id ? 'Я: ' : item.type === 'group' ? `${last.name}: ` : '') + last.body;
     const ink = selected ? roles.selected.text : colors.nameText;
+
+    if (parts.ChatRow) {
+      return (
+        <parts.ChatRow
+          index={index}
+          title={item.title}
+          preview={preview}
+          typing={!!t}
+          time={last ? formatTime(last.createdAt) : null}
+          unread={item.unread}
+          isNew={other?.status === 'candidate'}
+          online={!!other?.online}
+          avatar={other?.avatar ?? null}
+          selected={selected}
+          onPress={() => setActiveChat(item.id)}
+        />
+      );
+    }
 
     return (
       <Pressable
@@ -114,7 +134,17 @@ export function ChatListScreen({
 
   return (
     <View style={styles.root}>
-      {wide ? null : (
+      {wide ? null : parts.ListHeader ? (
+        <parts.ListHeader
+          myName={me.name}
+          myAvatar={me.avatar}
+          connected={connected}
+          query={query}
+          onQuery={onQuery}
+          onNewChat={() => onNewChat('direct')}
+          topInset={insets.top}
+        />
+      ) : (
         <Chrome style={[styles.header, { paddingTop: insets.top }]}>
           {skin.copy.listStrip ? <TitleStrip title={skin.copy.listStrip} /> : null}
           <View style={styles.headerRow}>
@@ -140,11 +170,11 @@ export function ChatListScreen({
         data={visible}
         keyExtractor={(c) => String(c.id)}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, parts.ChatRow && { gap: 0 }]}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
-          <View style={styles.top}>
-            {wide ? null : <SearchField value={query} onChange={onQuery} />}
+          <View style={[styles.top, parts.ChatRow && { paddingBottom: 8 }]}>
+            {wide || parts.ListHeader ? null : <SearchField value={query} onChange={onQuery} />}
             <View style={styles.chips}>
               <Plastic colors={roles.chipNew.grad} style={styles.chip} onPress={() => onNewChat('direct')} accessibilityLabel="Новый канал">
                 <Text style={[styles.chipText, { color: roles.chipNew.text }]}>{skin.copy.newChat}</Text>

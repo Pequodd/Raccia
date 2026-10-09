@@ -14,6 +14,7 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatListScreen, SearchField, type NewChatMode } from './src/screens/ChatListScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { NewChatScreen } from './src/screens/NewChatScreen';
+import { useParts } from './src/parts';
 import { tokenStorage } from './src/storage';
 import { MessengerProvider, useMessenger } from './src/store';
 import type { Me } from './src/types';
@@ -250,6 +251,15 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
     { key: 'profile', label: skin.copy.profile, icon: 'person' },
     { key: 'settings', label: skin.copy.settings, icon: 'settings' },
   ];
+  const parts = useParts();
+  if (parts.TabBar) {
+    return (
+      <parts.TabBar
+        bottomInset={insets.bottom}
+        items={items.map((it) => ({ key: it.key, label: it.label, on: it.key === tab, onPress: () => onTab(it.key) }))}
+      />
+    );
+  }
   return (
     <Chrome style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {items.map((it) => {
