@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,9 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError } from '../api';
 import { parseInvite } from '../config';
 import { PlayerHero } from '../components/heroes';
-import { ChromeLogo, Plastic, stickers } from '../components/y2k';
+
+const logo = require('../../assets/logo.webp');
+import { ChromeLogo, Plastic } from '../components/y2k';
 import { makeStyles, useSkin } from '../skins';
-import { diagonal } from '../y2k';
 import type { Me } from '../types';
 
 type Problem = { kind: 'auth' | 'offline' | 'other'; text: string };
@@ -102,12 +102,7 @@ export function AuthScreen({
             <PlayerHero />
           ) : (
             <>
-              <View style={styles.ball}>
-                <LinearGradient colors={skin.ball} {...diagonal} style={StyleSheet.absoluteFill} />
-                <Image source={stickers.idea} style={styles.ballOleg} contentFit="contain" />
-                <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} style={styles.ballShine} pointerEvents="none" />
-                <View style={styles.ballShade} pointerEvents="none" />
-              </View>
+              <Image source={logo} style={styles.brand} contentFit="contain" accessibilityLabel="Олег" />
               <View style={styles.logo}>
                 <ChromeLogo size={58} />
               </View>
@@ -224,27 +219,7 @@ const useStyles = makeStyles(({ colors, fonts, roles, frames, shape }) => ({
   root: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 26, justifyContent: 'center' },
   column: { width: '100%', maxWidth: 360, alignSelf: 'center', alignItems: 'stretch' },
-  ball: {
-    width: 236,
-    height: 236,
-    borderRadius: 118,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    boxShadow: '0 14px 30px rgba(0,112,138,0.35)',
-  },
-  ballOleg: { position: 'absolute', width: 300, height: 300, left: -32, top: 22 },
-  ballShine: { position: 'absolute', left: 40, right: 40, top: 6, height: 90, borderRadius: 60 },
-  ballShade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 118,
-    boxShadow: 'inset 0 3px 0 rgba(255,255,255,0.6), inset 0 -14px 26px rgba(0,50,70,0.4)',
-  },
+  brand: { width: 200, height: 200, alignSelf: 'center', boxShadow: '0 14px 30px rgba(0,0,0,0.35)', borderRadius: 36 },
   logo: { alignItems: 'center', marginTop: 10 },
   slogan: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center', marginTop: 8 },
   fields: { gap: 12, marginTop: 22 },

@@ -3,7 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { makeStyles, useSkin } from '../skins';
-import { stickers } from './y2k';
+
+const logo = require('../../assets/logo.webp');
 
 // Winamp title strip: gold grip lines either side of a spaced-out caption.
 export function TitleStrip({ title }: { title: string }) {
@@ -90,7 +91,7 @@ export function PlayerHero() {
       <TitleStrip title={skin.copy.heroTitle ?? 'ОЛЕГ'} />
       <View style={styles.playerBody}>
         <View style={styles.cover}>
-          <Image source={stickers.idea} style={styles.coverImage} contentFit="contain" />
+          <Image source={logo} style={styles.coverImage} contentFit="contain" />
           <Text style={styles.coverTime}>▶ 00:00</Text>
         </View>
         <View style={styles.playerRight}>
@@ -120,7 +121,7 @@ const useStyles = makeStyles(({ colors, fonts, chrome, frames }) => ({
   },
   playerBody: { flexDirection: 'row', gap: 10, padding: 10 },
   cover: { width: 150, height: 150, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden' },
-  coverImage: { position: 'absolute', width: 150, height: 150, left: 0, bottom: -14 },
+  coverImage: { position: 'absolute', width: 120, height: 120, left: 14, top: 18 },
   coverTime: { position: 'absolute', left: 6, top: 4, fontFamily: fonts.mono, fontSize: 10, color: colors.lcdText },
   playerRight: { flex: 1, gap: 8, minWidth: 0 },
   marquee: { height: 28, backgroundColor: colors.lcdBg, ...frames.field, overflow: 'hidden', justifyContent: 'center' },
