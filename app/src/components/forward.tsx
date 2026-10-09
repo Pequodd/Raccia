@@ -10,7 +10,17 @@ import { plural } from '../y2k';
 import { Lollipop, Plastic } from './y2k';
 
 // Long press on a message: forward it or copy its text.
-export function MessageActions({ message, onForward, onClose }: { message: Message | null; onForward: (m: Message) => void; onClose: () => void }) {
+export function MessageActions({
+  message,
+  onForward,
+  onDenounce,
+  onClose,
+}: {
+  message: Message | null;
+  onForward: (m: Message) => void;
+  onDenounce?: (m: Message) => void; // someone else's message only
+  onClose: () => void;
+}) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [copied, setCopied] = useState(false);
@@ -45,6 +55,18 @@ export function MessageActions({ message, onForward, onClose }: { message: Messa
             accessibilityRole="button"
           >
             <Text style={styles.actionText}>{copied ? '✓ Скопировано' : '⧉ Скопировать текст'}</Text>
+          </Pressable>
+        ) : null}
+        {onDenounce ? (
+          <Pressable
+            style={({ pressed }) => [styles.action, pressed && { opacity: 0.7 }]}
+            onPress={() => {
+              onClose();
+              onDenounce(message);
+            }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.actionText}>🚨 Донос</Text>
           </Pressable>
         ) : null}
         <Pressable style={styles.cancel} onPress={onClose} accessibilityRole="button">

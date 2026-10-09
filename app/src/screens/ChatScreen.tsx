@@ -14,6 +14,7 @@ import {
   type TextInputKeyPressEventData,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DenounceSheet, type DenounceTarget } from '../components/denounce';
 import { ForwardSheet, MessageActions } from '../components/forward';
 import { MeetupCard, MeetupSheet } from '../components/meetup';
 import { useCalls } from '../calls/CallProvider';
@@ -65,6 +66,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
   const [meeting, setMeeting] = useState(false);
   const [acting, setActing] = useState<Message | null>(null); // long-pressed message
   const [forwarding, setForwarding] = useState<Message | null>(null);
+  const [denouncing, setDenouncing] = useState<DenounceTarget | null>(null);
   const voice = useVoiceRecorder();
   useEffect(() => {
     if (voice.error) setError(voice.error);
@@ -441,7 +443,13 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
         onClose={() => setAttaching(false)}
       />
       <MeetupSheet chatId={chatId} visible={meeting} onClose={() => setMeeting(false)} />
-      <MessageActions message={acting} onForward={setForwarding} onClose={() => setActing(null)} />
+      <MessageActions
+        message={acting}
+        onForward={setForwarding}
+        onDenounce={acting && acting.userId !== me.id ? (m) => setDenouncing({ name: m.name, quote: m.body || undefined }) : undefined}
+        onClose={() => setActing(null)}
+      />
+      <DenounceSheet target={denouncing} onClose={() => setDenouncing(null)} />
       <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} />
       <AttachPreview
         draft={draft}

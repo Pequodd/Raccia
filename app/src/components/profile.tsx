@@ -8,6 +8,7 @@ import { useMessenger } from '../store';
 import type { Profile, User } from '../types';
 import { plural } from '../y2k';
 import { WebFileInput } from '../media/WebFileInput';
+import { DenounceSheet } from './denounce';
 import { Lcd, Lollipop, Plastic } from './y2k';
 
 export function joinedLabel(ts: number) {
@@ -108,7 +109,9 @@ export function UserCard({ userId, onClose }: { userId: number | null; onClose: 
   const skin = useSkin();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [denouncing, setDenouncing] = useState(false);
   useEffect(() => {
+    setDenouncing(false);
     setProfile(null);
     setError(null);
     if (userId == null) return;
@@ -135,12 +138,18 @@ export function UserCard({ userId, onClose }: { userId: number | null; onClose: 
             ) : (
               <Text style={styles.bioMuted}>{error ?? 'Ищем абонента в эфире…'}</Text>
             )}
+            {profile ? (
+              <Pressable onPress={() => setDenouncing(true)} style={styles.denounce} accessibilityRole="button">
+                <Text style={styles.denounceText}>🚨 Донос</Text>
+              </Pressable>
+            ) : null}
             <Plastic colors={skin.roles.negative.grad} style={styles.close} onPress={onClose} accessibilityLabel="Закрыть">
               <Text style={[styles.closeText, { color: skin.roles.negative.text }]}>Закрыть</Text>
             </Plastic>
           </ScrollView>
         </Pressable>
       </Pressable>
+      <DenounceSheet target={denouncing && profile ? { name: profile.name } : null} onClose={() => setDenouncing(false)} />
     </Modal>
   );
 }
@@ -178,6 +187,8 @@ const useStyles = makeStyles(({ colors, fonts, frames }) => ({
   nick: { fontFamily: fonts.mono, fontSize: 13, color: colors.text3, marginTop: -8 },
   bio: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22, color: colors.ink, textAlign: 'center' },
   bioMuted: { fontFamily: fonts.body, fontSize: 15, color: colors.text3, textAlign: 'center', paddingVertical: 30 },
+  denounce: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+  denounceText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.dangerText },
   close: { height: 46, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   closeText: { fontFamily: fonts.bodyHeavy, fontSize: 16 },
 }));
