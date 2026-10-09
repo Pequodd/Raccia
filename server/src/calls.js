@@ -47,7 +47,7 @@ export function createCalls(deps) {
     deps.postCall(call, outcome, call.answeredAt ? Date.now() - call.answeredAt : 0);
   }
 
-  function invite(userId, { chatId, video }) {
+  function invite(userId, { chatId, video }, ws) {
     const to = deps.directPeer(Number(chatId), userId);
     if (!to) return deps.send(userId, { type: 'call_error', error: 'Звонить можно в личном чате' });
     if (byUser.has(userId) || byUser.has(to)) return deps.send(userId, { type: 'call_busy', chatId: Number(chatId) });
@@ -58,6 +58,8 @@ export function createCalls(deps) {
       to,
       video: Boolean(video),
       answeredAt: 0,
+      fromWs: ws,
+      toWs: null,
       timer: setTimeout(() => end(call, 'missed'), RING_MS),
     };
     call.timer.unref?.();
@@ -76,8 +78,8 @@ export function createCalls(deps) {
     }
   }
 
-  function handle(userId, msg) {
-    if (msg.type === 'call_invite') return invite(userId, msg);
+  function handle(userId, msg, ws) {
+    if (msg.type === 'call_invite') return invite(userId, msg, ws);
     const call = calls.get(String(msg.callId ?? ''));
     if (!call || (call.from !== userId && call.to !== userId)) return;
     switch (msg.type) {
@@ -85,6 +87,7 @@ export function createCalls(deps) {
         if (userId !== call.to || call.answeredAt) return;
         clearTimeout(call.timer);
         call.answeredAt = Date.now();
+        call.toWs = ws;
         deps.send(call.from, { type: 'call_accepted', callId: call.id });
         // Other tabs of the callee stop ringing.
         deps.send(call.to, { type: 'call_answered_elsewhere', callId: call.id });
@@ -107,6 +110,15 @@ export function createCalls(deps) {
     }
   }
 
+  // The caller's tab, or the tab that picked up, disconnected: the call is over.
+  function onSocketClosed(userId, ws) {
+    const call = calls.get(byUser.get(userId));
+    if (!call) return;
+    if ((call.from === userId && call.fromWs === ws) || (call.to === userId && call.toWs === ws)) {
+      end(call, call.answeredAt ? 'failed' : 'canceled');
+    }
+  }
+
   // Someone (re)connected while their phone is ringing: show the call again.
   function onConnect(userId) {
     const call = calls.get(byUser.get(userId));
@@ -117,5 +129,5 @@ export function createCalls(deps) {
     for (const call of calls.values()) clearTimeout(call.timer);
   }
 
-  return { handle, onConnect, stop };
+  return { handle, onConnect, onSocketClosed, stop };
 }

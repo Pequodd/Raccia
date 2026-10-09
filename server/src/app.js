@@ -776,6 +776,7 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
 
   const conferences = createConferences({
     send,
+    sendWs: (ws, event) => ws?.readyState === ws?.OPEN && ws.send(JSON.stringify(event)),
     isWatching,
     notify: (uid, payload) => push.notify(uid, payload),
     memberIds,
@@ -943,11 +944,11 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
         return;
       }
       if (typeof msg?.type === 'string' && msg.type.startsWith('conf_')) {
-        conferences.handle(user.id, msg);
+        conferences.handle(user.id, msg, ws);
         return;
       }
       if (typeof msg?.type === 'string' && msg.type.startsWith('call_')) {
-        calls.handle(user.id, msg);
+        calls.handle(user.id, msg, ws);
         return;
       }
       if (msg?.type === 'visibility') {
@@ -965,11 +966,12 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     });
 
     ws.on('close', () => {
+      conferences.onSocketClosed(user.id, ws);
+      calls.onSocketClosed(user.id, ws);
       const set = sockets.get(user.id);
       set?.delete(ws);
       if (set && set.size === 0) {
         sockets.delete(user.id);
-        conferences.onOffline(user.id);
         for (const id of contactsOf(user.id)) send(id, { type: 'presence', userId: user.id, online: false });
       }
     });

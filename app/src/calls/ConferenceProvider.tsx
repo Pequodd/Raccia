@@ -151,7 +151,8 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     return onConfEvent(async (event: ConfEvent) => {
       switch (event.type) {
         case 'conf_joined': {
-          if (!localRef.current) return sendSocket({ type: 'conf_leave', confId: event.conf.id });
+          // Not for this device (no camera/mic was opened here): ignore.
+          if (!localRef.current) break;
           tones.stop();
           setJoining(false);
           setInvite(null);
@@ -208,7 +209,8 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
           setPeer(event.userId, { screen: event.on });
           break;
         case 'conf_left':
-          cleanup();
+          // Only for the room we are in now (an old seat being dropped must not close it).
+          if (confRef.current?.info.id === event.confId) cleanup();
           break;
         case 'conf_error':
           localRef.current?.getTracks().forEach((t) => t.stop());
@@ -259,6 +261,17 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     localRef.current = stream;
     sendSocket({ type: 'conf_join', confId });
   }, [getMedia, sendSocket]);
+
+  // Closing the tab mid-conference: leave properly.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.addEventListener) return;
+    const bye = () => {
+      const id = confRef.current?.info.id;
+      if (id) sendSocket({ type: 'conf_leave', confId: id });
+    };
+    window.addEventListener('pagehide', bye);
+    return () => window.removeEventListener('pagehide', bye);
+  }, [sendSocket]);
 
   const dismissInvite = useCallback(() => {
     tones.stop();

@@ -99,3 +99,31 @@ test('conference: start in a group, invite, join, relay, screen, leave, card', a
   A.ws.close();
   B.ws.close();
 });
+
+test('a stale seat from another tab does not close the new conference', async () => {
+  const a = await api('/api/login', null, { username: 'anya', password: 'secret1' });
+  const chats = (await api('/api/chats', a.token)).chats;
+  const direct = chats.find((c) => c.type === 'direct').id;
+  const group = chats.find((c) => c.type === 'group').id;
+  const tab1 = connect(a.token);
+  const tab2 = connect(a.token);
+  await Promise.all([tab1.open, tab2.open]);
+
+  // Tab 1 starts a conference and is closed without «Выйти»; tab 2 stays open.
+  tab1.send({ type: 'conf_start', chatId: group, video: true });
+  const first = await tab1.next('conf_joined');
+  tab1.ws.close();
+  await new Promise((r) => setTimeout(r, 100));
+
+  // Tab 2 starts another one: it opens and stays, no «you left» for it.
+  tab2.send({ type: 'conf_start', chatId: direct, video: true });
+  const second = await tab2.next('conf_joined');
+  assert.notEqual(second.conf.id, first.conf.id);
+  await new Promise((r) => setTimeout(r, 100));
+  await assert.rejects(tab2.next('conf_left', (e) => e.confId === second.conf.id));
+
+  // Starting in the same chat again re-joins instead of hanging on «Подключаемся».
+  tab2.send({ type: 'conf_start', chatId: direct, video: true });
+  assert.equal((await tab2.next('conf_joined')).conf.id, second.conf.id);
+  tab2.ws.close();
+});
