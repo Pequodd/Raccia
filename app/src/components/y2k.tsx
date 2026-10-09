@@ -35,6 +35,7 @@ export const stickers = {
 export function GridBackground() {
   const skin = useSkin();
   const { background } = skin;
+  if (background.kind === 'bliss') return <Bliss sky={background.gradient} grass={background.line} />;
   const pattern =
     background.kind === 'scanlines' ? (
       <Pattern id="bg" width="3" height="3" patternUnits="userSpaceOnUse">
@@ -52,6 +53,28 @@ export function GridBackground() {
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>{pattern}</Defs>
         <Rect width="100%" height="100%" fill="url(#bg)" />
+      </Svg>
+    </View>
+  );
+}
+
+// Windows XP «Безмятежность»: blue sky, a few clouds, a green hill.
+function Bliss({ sky, grass }: { sky: readonly [string, string]; grass: string }) {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient colors={sky} style={StyleSheet.absoluteFill} />
+      <Svg width="100%" height="100%" viewBox="0 0 400 800" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#8BD34A" />
+            <Stop offset="0.35" stopColor={grass} />
+            <Stop offset="1" stopColor="#2F6B12" />
+          </SvgGradient>
+        </Defs>
+        <Path d="M40 150c10-22 48-26 62-8 14-18 52-12 56 12 22 0 30 26 6 30H46c-24 0-26-26-6-34z" fill="rgba(255,255,255,0.75)" />
+        <Path d="M250 90c12-18 44-20 56-4 16-12 46-4 46 16 18 4 18 26-4 26H256c-22 0-24-28-6-38z" fill="rgba(255,255,255,0.6)" />
+        <Path d="M0 560C90 500 210 470 300 500S400 560 400 560V800H0z" fill="url(#hill)" />
+        <Path d="M0 560C90 500 210 470 300 500S400 560 400 560" stroke="rgba(255,255,255,0.25)" strokeWidth="3" fill="none" />
       </Svg>
     </View>
   );

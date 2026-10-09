@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { NativeSyntheticEvent, TextInputKeyPressEventData } from 'react-native';
 import { useSkin } from '../skins';
 import { winampParts } from './winamp';
+import { xpParts } from './xp';
 
 // Pieces of a screen a theme may draw its own way. Screens keep the logic and the
 // default (Y2K) look; a theme that needs a different layout — not just colours —
@@ -65,6 +66,7 @@ export type Parts = {
 
 const byTheme: Record<string, Partial<Parts>> = {
   winamp: winampParts,
+  xp: xpParts,
 };
 
 export function useParts(): Partial<Parts> {

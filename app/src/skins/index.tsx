@@ -4,12 +4,13 @@ import { StyleSheet } from 'react-native';
 import { night } from './night';
 import { winamp } from './winamp';
 import type { Skin } from './types';
+import { xp } from './xp';
 import { y2k } from './y2k';
 
 export type { Copy, Fill, Frame, Gradient, Skin } from './types';
 
 // Add a skin here and it appears in Settings.
-export const skins: Skin[] = [y2k, night, winamp];
+export const skins: Skin[] = [y2k, night, winamp, xp];
 export const defaultSkin = y2k;
 
 const STORAGE_KEY = 'oleg.skin';
