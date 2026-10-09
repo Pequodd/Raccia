@@ -24,6 +24,9 @@ case "${ID:-}" in ubuntu | debian) ;; *) die "Нужна Ubuntu или Debian, �
 
 say "1/7 Системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
+# The Cloudsmith repo for Caddy started answering «402 Payment Required» and breaks apt;
+# Caddy comes from Ubuntu/Debian's own packages now.
+rm -f /etc/apt/sources.list.d/caddy-stable.list
 apt-get update -y
 apt-get install -y curl git ca-certificates gnupg xz-utils debian-keyring debian-archive-keyring apt-transport-https ffmpeg
 
@@ -99,14 +102,7 @@ curl -sf http://127.0.0.1:3000/api/health >/dev/null || die "Сервер не �
 
 say "7/7 HTTPS для $DOMAIN (Caddy)"
 if ! command -v caddy >/dev/null 2>&1; then
-  if curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
-    && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list \
-    && apt-get update -y && apt-get install -y caddy; then
-    :
-  else
-    rm -f /etc/apt/sources.list.d/caddy-stable.list
-    apt-get update -y && apt-get install -y caddy || die "Не удалось установить Caddy"
-  fi
+  apt-get install -y caddy || die "Не удалось установить Caddy (apt-get install caddy)"
 fi
 cat > /etc/caddy/Caddyfile <<CADDY
 $DOMAIN, www.$DOMAIN {
