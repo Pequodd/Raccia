@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // node:sqlite works without flags from Node 22.13 / 23.4 on; fail with a clear hint instead of a stack trace.
@@ -17,7 +18,15 @@ const DB_FILE = process.env.DB_FILE || fileURLToPath(new URL('../data/oleg.db', 
 const db = openDb(DB_FILE);
 // VOTE_MS shortens the initiation vote for local testing (default: 5 minutes).
 const voteMs = Number(process.env.VOTE_MS) || undefined;
-const { server, wss } = createServer(db, { voteMs });
+const { app, server, wss } = createServer(db, { voteMs });
+
+// Serve the built web version (app/dist) from the same address, if it has been built:
+// one port for everything — handy in Codespaces and on a single server.
+const WEB_DIR = fileURLToPath(new URL('../../app/dist', import.meta.url));
+if (existsSync(WEB_DIR)) {
+  const { default: express } = await import('express');
+  app.use(express.static(WEB_DIR));
+}
 
 function onListenError(err) {
   if (err.code === 'EADDRINUSE') {
@@ -33,4 +42,5 @@ wss.on('error', onListenError);
 
 server.listen(PORT, () => {
   console.log(`Oleg server: http://localhost:${PORT}`);
+  if (existsSync(WEB_DIR)) console.log(`Web version: http://localhost:${PORT}/`);
 });

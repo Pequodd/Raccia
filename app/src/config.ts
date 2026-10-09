@@ -13,9 +13,11 @@ function resolveApiUrl(): string {
     return `http://${hostUri.split(':')[0]}:3000`;
   }
   if (Platform.OS === 'android') return 'http://10.0.2.2:3000';
-  // Web: the server runs on the same machine as the page, whatever address it was opened by.
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname) {
-    return `http://${window.location.hostname}:3000`;
+    // Expo dev server (port 8081): the API runs next to it on port 3000.
+    if (window.location.port === '8081') return `http://${window.location.hostname}:3000`;
+    // Otherwise the server itself serves the page (Codespaces, own server): same address.
+    return window.location.origin;
   }
   return 'http://localhost:3000';
 }

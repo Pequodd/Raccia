@@ -1,0 +1,12 @@
+{
+  // GitHub Codespaces: Code → Codespaces → Create codespace. Oleg starts by itself
+  // and opens in the browser; the port is made public so friends can join by the link.
+  "name": "Олег",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "Олег", "onAutoForward": "openBrowser" }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start.sh"
+}
