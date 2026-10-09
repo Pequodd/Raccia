@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TitleStrip } from '../components/heroes';
 import { CandidateCard, InviteCard, ResultCard, VoteCard } from '../components/initiation';
 import { Chrome, Icon, Lollipop, Plastic } from '../components/y2k';
-import { makeStyles, useSkin } from '../skins';
+import { makeStyles, radius, useSkin } from '../skins';
 import { useState } from 'react';
 import { useMessenger } from '../store';
 import type { Chat } from '../types';
@@ -13,7 +14,7 @@ export type NewChatMode = 'direct' | 'group';
 
 export function SearchField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
     <View style={styles.search}>
@@ -51,7 +52,7 @@ export function ChatListScreen({
   onNewChat: (mode: NewChatMode) => void;
 }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { chats, me, connected, activeChatId, setActiveChat, typing, votes, results } = useMessenger();
@@ -68,7 +69,7 @@ export function ChatListScreen({
     if (t) preview = item.type === 'group' ? `${t.name} ${skin.copy.typing}` : skin.copy.typing;
     else if (last?.kind === 'service') preview = last.body;
     else if (last) preview = (last.userId === me.id ? 'Я: ' : item.type === 'group' ? `${last.name}: ` : '') + last.body;
-    const ink = selected ? colors.white : colors.ink;
+    const ink = selected ? roles.selected.text : colors.nameText;
 
     return (
       <Pressable
@@ -76,9 +77,11 @@ export function ChatListScreen({
         style={({ pressed }) => [styles.card, selected && styles.cardSelected, pressed && { transform: [{ scale: 0.98 }] }]}
       >
         {selected ? (
-          <View style={[StyleSheet.absoluteFill, { borderRadius: 18, overflow: 'hidden' }]}>
-            <LinearGradient colors={plastic.bondi} {...diagonal} style={StyleSheet.absoluteFill} />
-            <LinearGradient colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']} style={styles.cardShine} />
+          <View style={[StyleSheet.absoluteFill, { borderRadius: radius(skin, 18), overflow: 'hidden' }]}>
+            <LinearGradient colors={roles.selected.grad} {...diagonal} style={StyleSheet.absoluteFill} />
+            {skin.shape.kind === 'glossy' ? (
+              <LinearGradient colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']} style={styles.cardShine} />
+            ) : null}
           </View>
         ) : null}
         <Lollipop name={item.title} online={other?.online} avatar={other?.avatar} />
@@ -99,7 +102,7 @@ export function ChatListScreen({
               {preview}
             </Text>
             {item.unread > 0 ? (
-              <Plastic colors={plastic.pink} style={styles.badge} shadow="0 0 8px rgba(255,106,230,0.7)">
+              <Plastic colors={roles.badge.grad} style={styles.badge} shadow="0 0 8px rgba(255,106,230,0.7)">
                 <Text style={styles.badgeText}>{item.unread}</Text>
               </Plastic>
             ) : null}
@@ -113,6 +116,7 @@ export function ChatListScreen({
     <View style={styles.root}>
       {wide ? null : (
         <Chrome style={[styles.header, { paddingTop: insets.top }]}>
+          {skin.copy.listStrip ? <TitleStrip title={skin.copy.listStrip} /> : null}
           <View style={styles.headerRow}>
             <Lollipop name={me.name} size={38} avatar={me.avatar} />
             <View style={styles.headerTitle}>
@@ -120,13 +124,13 @@ export function ChatListScreen({
               {connected ? null : <Text style={styles.connecting}>Ищем спутник…</Text>}
             </View>
             <Plastic
-              colors={plastic.tangerine}
+              colors={roles.round.grad}
               style={styles.round}
               onPress={() => onNewChat('direct')}
               accessibilityLabel="Новый канал"
               shadow="0 3px 8px rgba(255,122,0,0.35)"
             >
-              <Icon name="pencil" size={18} color={colors.white} />
+              <Icon name="pencil" size={18} color={roles.round.text} />
             </Plastic>
           </View>
         </Chrome>
@@ -142,14 +146,14 @@ export function ChatListScreen({
           <View style={styles.top}>
             {wide ? null : <SearchField value={query} onChange={onQuery} />}
             <View style={styles.chips}>
-              <Plastic colors={plastic.bondi} style={styles.chip} onPress={() => onNewChat('direct')} accessibilityLabel="Новый канал">
-                <Text style={styles.chipText}>{skin.copy.newChat}</Text>
+              <Plastic colors={roles.chipNew.grad} style={styles.chip} onPress={() => onNewChat('direct')} accessibilityLabel="Новый канал">
+                <Text style={[styles.chipText, { color: roles.chipNew.text }]}>{skin.copy.newChat}</Text>
               </Plastic>
-              <Plastic colors={plastic.grape} style={styles.chip} onPress={() => setInviting(true)} accessibilityLabel="Выдать инвайт">
-                <Text style={styles.chipText}>{skin.copy.invite}</Text>
+              <Plastic colors={roles.chipInvite.grad} style={styles.chip} onPress={() => setInviting(true)} accessibilityLabel="Выдать инвайт">
+                <Text style={[styles.chipText, { color: roles.chipInvite.text }]}>{skin.copy.invite}</Text>
               </Plastic>
-              <Plastic colors={plastic.lime} style={styles.chip} onPress={() => onNewChat('group')} accessibilityLabel="Тусовка">
-                <Text style={[styles.chipText, { color: colors.limeText }]}>{skin.copy.newGroup}</Text>
+              <Plastic colors={roles.chipGroup.grad} style={styles.chip} onPress={() => onNewChat('group')} accessibilityLabel="Тусовка">
+                <Text style={[styles.chipText, { color: roles.chipGroup.text }]}>{skin.copy.newGroup}</Text>
               </Plastic>
             </View>
             {inviting ? <InviteCard onClose={() => setInviting(false)} /> : null}
@@ -173,7 +177,7 @@ export function ChatListScreen({
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   root: { flex: 1 },
   header: {
     borderBottomWidth: 1,
@@ -206,11 +210,12 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     borderWidth: 1,
     borderColor: colors.fieldBorderSoft,
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.1)',
+    ...frames.field,
   },
-  searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 14, color: colors.ink, outlineWidth: 0, height: 36 },
+  searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 14, color: colors.fieldText, outlineWidth: 0, height: 36 },
   chips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   chip: { height: 32, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
-  chipText: { fontFamily: fonts.bodyHeavy, fontSize: 13, color: colors.white },
+  chipText: { fontFamily: fonts.bodyHeavy, fontSize: 13, color: roles.chipNew.text },
   card: {
     height: 66,
     borderRadius: 18,
@@ -222,6 +227,7 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     boxShadow: '0 2px 6px rgba(27,21,48,0.08)',
+    ...frames.card,
   },
   cardSelected: { borderColor: 'rgba(255,255,255,0.6)', boxShadow: '0 3px 10px rgba(0,112,138,0.35)' },
   cardShine: { position: 'absolute', left: 0, right: 0, top: 0, height: '45%' },
@@ -231,6 +237,6 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   time: { fontFamily: fonts.mono, fontSize: 11, color: colors.text4 },
   preview: { flex: 1, fontFamily: fonts.body, fontSize: 13, color: colors.text3 },
   badge: { minWidth: 22, height: 22, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { fontFamily: fonts.bodyHeavy, fontSize: 12, color: colors.white },
+  badgeText: { fontFamily: fonts.bodyHeavy, fontSize: 12, color: roles.badge.text },
   empty: { fontFamily: fonts.body, fontSize: 14, color: colors.text3, textAlign: 'center', padding: 28 },
 }));

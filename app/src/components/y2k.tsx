@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, Line, LinearGradient as SvgGradient, Path, Pattern, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { avatarGradient, avatarTextColor, diagonal, initials } from '../y2k';
-import { makeStyles, useSkin } from '../skins';
+import { makeStyles, radius, useSkin } from '../skins';
 
 // The Oleg sticker pack; the same ids serve as avatars (server: AVATARS).
 export const stickerImages: Record<string, number> = {
@@ -31,32 +31,38 @@ export const stickers = {
   q: stickerImages.q,
 };
 
-// «Cyberspace grid» behind every screen.
+// The screen background: grid, CRT scanlines, … — whatever the skin asks for.
 export function GridBackground() {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
-  const styles = useStyles();
+  const { background } = skin;
+  const pattern =
+    background.kind === 'scanlines' ? (
+      <Pattern id="bg" width="3" height="3" patternUnits="userSpaceOnUse">
+        <Rect x="0" y="0" width="3" height="1" fill={background.line} />
+      </Pattern>
+    ) : (
+      <Pattern id="bg" width="24" height="24" patternUnits="userSpaceOnUse">
+        <Line x1="0" y1="0.5" x2="24" y2="0.5" stroke={background.line} strokeWidth="1" />
+        <Line x1="0.5" y1="0" x2="0.5" y2="24" stroke={background.line} strokeWidth="1" />
+      </Pattern>
+    );
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={skin.background.gradient} start={{ x: 0.37, y: 0 }} end={{ x: 0.63, y: 1 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={background.gradient} start={{ x: 0.37, y: 0 }} end={{ x: 0.63, y: 1 }} style={StyleSheet.absoluteFill} />
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-        <Defs>
-          <Pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-            <Line x1="0" y1="0.5" x2="24" y2="0.5" stroke={skin.background.grid} strokeWidth="1" />
-            <Line x1="0.5" y1="0" x2="0.5" y2="24" stroke={skin.background.grid} strokeWidth="1" />
-          </Pattern>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#grid)" />
+        <Defs>{pattern}</Defs>
+        <Rect width="100%" height="100%" fill="url(#bg)" />
       </Svg>
     </View>
   );
 }
 
-// Glossy translucent plastic: gradient body, top highlight, inner shading.
+// A filled surface — buttons, chips, badges. Drawn the way the skin's shape says:
+// glossy plastic, bevelled metal, pixel blocks, phosphor, enamel or XP Luna.
 export function Plastic({
   colors: grad,
   style,
-  radius = 999,
+  radius: wanted = 999,
   shadow,
   children,
   onPress,
@@ -73,38 +79,55 @@ export function Plastic({
   accessibilityLabel?: string;
 }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
   const styles = useStyles();
+  const kind = skin.shape.kind;
+  const r = radius(skin, wanted);
+
   const body = (pressed: boolean) => (
     <>
-      <View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]} pointerEvents="none">
-        <LinearGradient colors={grad} {...diagonal} style={StyleSheet.absoluteFill} />
-        <LinearGradient
-          colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0)']}
-          style={styles.highlight}
-        />
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              borderRadius: radius,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.55)',
-              boxShadow: pressed
-                ? 'inset 0 3px 6px rgba(0,0,0,0.25)'
-                : 'inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -6px 10px rgba(0,0,0,0.18)',
-            },
-          ]}
-        />
+      <View style={[StyleSheet.absoluteFill, { borderRadius: r, overflow: 'hidden' }]} pointerEvents="none">
+        {kind === 'glossy' || kind === 'luna' ? (
+          <>
+            <LinearGradient colors={grad} {...(kind === 'luna' ? {} : diagonal)} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0)']} style={styles.highlight} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  borderRadius: r,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.55)',
+                  boxShadow: pressed
+                    ? 'inset 0 3px 6px rgba(0,0,0,0.25)'
+                    : 'inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -6px 10px rgba(0,0,0,0.18)',
+                },
+              ]}
+            />
+          </>
+        ) : kind === 'bevel' ? (
+          <>
+            <LinearGradient colors={pressed ? [grad[1], grad[0]] : grad} style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, pressed ? styles.bevelPressed : skin.frames.button]} />
+          </>
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: grad[0] }]} />
+        )}
       </View>
       {children}
     </>
   );
 
-  const base: StyleProp<ViewStyle> = [
-    { borderRadius: radius, boxShadow: shadow ?? '0 3px 8px rgba(27,21,48,0.25)' },
-    style,
-  ];
+  const shapeStyle: ViewStyle =
+    kind === 'pixel'
+      ? { borderWidth: 3, borderColor: '#000', boxShadow: '3px 3px 0 #000' }
+      : kind === 'enamel'
+        ? { boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.25), 0 2px 3px rgba(0,0,0,0.2)' }
+        : kind === 'bevel' || kind === 'phosphor'
+          ? { boxShadow: 'none' }
+          : { boxShadow: shadow ?? '0 3px 8px rgba(27,21,48,0.25)' };
+  const base: StyleProp<ViewStyle> = [{ borderRadius: r }, shapeStyle, style, { borderRadius: r }];
+  const pressedStyle: ViewStyle =
+    kind === 'pixel' ? { transform: [{ translateX: 2 }, { translateY: 2 }], boxShadow: '1px 1px 0 #000' } : { transform: [{ scale: 0.96 }] };
 
   if (!onPress) return <View style={base}>{body(false)}</View>;
   return (
@@ -113,7 +136,7 @@ export function Plastic({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [base, { opacity: disabled ? 0.55 : 1 }, pressed && { transform: [{ scale: 0.96 }] }]}
+      style={({ pressed }) => [base, { opacity: disabled ? 0.55 : 1 }, pressed && pressedStyle]}
     >
       {({ pressed }) => body(pressed)}
     </Pressable>
@@ -123,7 +146,7 @@ export function Plastic({
 // Brushed chrome: header bars, tab bar, secondary buttons.
 export function Chrome({ style, children }: { style?: StyleProp<ViewStyle>; children?: ReactNode }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
     <View style={style}>
@@ -149,7 +172,7 @@ export function ChromeButton({
   disabled?: boolean;
 }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
     <Pressable
@@ -159,14 +182,15 @@ export function ChromeButton({
       accessibilityLabel={label}
       style={({ pressed }) => [
         styles.chromeButton,
-        size ? { width: size, height: size, borderRadius: size / 2 } : { height: 38, borderRadius: 19, paddingHorizontal: 16 },
+        size ? { width: size, height: size, borderRadius: radius(skin, size / 2) } : { height: 38, borderRadius: radius(skin, 19), paddingHorizontal: 16 },
+        skin.shape.kind === 'bevel' && skin.frames.button,
         { opacity: disabled ? 0.55 : 1 },
         pressed && { transform: [{ scale: 0.96 }] },
         style,
       ]}
     >
-      <LinearGradient colors={chrome.colors} locations={chrome.locations} style={StyleSheet.absoluteFill} />
-      {icon ?? <Text style={styles.chromeButtonText}>{label}</Text>}
+      <LinearGradient colors={roles.negative.grad} style={StyleSheet.absoluteFill} />
+      {icon ?? <Text style={[styles.chromeButtonText, { color: roles.negative.text }]}>{label}</Text>}
     </Pressable>
   );
 }
@@ -174,7 +198,7 @@ export function ChromeButton({
 // «ОЛЕГ» in chrome letters with a hard drop shadow.
 export function ChromeLogo({ size = 58, text = 'ОЛЕГ' }: { size?: number; text?: string }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const width = Math.round(size * text.length * 0.78);
   const height = Math.round(size * 1.25);
@@ -214,15 +238,15 @@ export function Lollipop({
   avatar?: string | null;
 }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const grad = avatarGradient(name, skin);
   const image = avatar ? stickerImages[avatar] : undefined;
   const dot = Math.max(10, Math.round(size * 0.31));
   return (
     <View style={{ width: size, height: size }}>
-      <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', boxShadow: '0 2px 5px rgba(27,21,48,0.25)' }}>
-        <LinearGradient colors={image ? plastic.stickerAvatar : grad} {...diagonal} style={StyleSheet.absoluteFill} />
+      <View style={{ width: size, height: size, borderRadius: radius(skin, size / 2), overflow: 'hidden', boxShadow: '0 2px 5px rgba(27,21,48,0.25)' }}>
+        <LinearGradient colors={image ? skin.stickerAvatar : grad} {...diagonal} style={StyleSheet.absoluteFill} />
         {image ? (
           <Image source={image} style={{ width: size, height: size, transform: [{ translateY: size * 0.08 }, { scale: 1.15 }] }} contentFit="contain" />
         ) : (
@@ -233,7 +257,7 @@ export function Lollipop({
         <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} style={[styles.highlight, { height: '45%' }]} pointerEvents="none" />
         <View
           pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { borderRadius: size / 2, boxShadow: 'inset 0 -4px 8px rgba(0,0,0,0.2)' }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: radius(skin, size / 2), boxShadow: 'inset 0 -4px 8px rgba(0,0,0,0.2)' }]}
         />
       </View>
       {online ? (
@@ -244,7 +268,7 @@ export function Lollipop({
             bottom: -1,
             width: dot,
             height: dot,
-            borderRadius: dot / 2,
+            borderRadius: radius(skin, dot / 2),
             backgroundColor: colors.neon,
             borderWidth: 2,
             borderColor: colors.white,
@@ -259,7 +283,7 @@ export function Lollipop({
 // Green LCD read-out: timers, pager screens.
 export function Lcd({ children, size = 16 }: { children: ReactNode; size?: number }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
     <View style={styles.lcd}>
@@ -271,7 +295,7 @@ export function Lcd({ children, size = 16 }: { children: ReactNode; size?: numbe
 // Delivery ticks: 1 sent · 2 delivered («Получено») · 3 read («Записано на дискету»).
 export function Ticks({ count, color }: { count: 1 | 2 | 3; color: string }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
     <View style={{ flexDirection: 'row', marginLeft: 3 }}>
@@ -297,7 +321,7 @@ const ICON_PATHS: Record<IconName, string> = {
 
 export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color?: string }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   // The wrapper keeps the icon above absolutely positioned plastic layers on the web.
   return (
@@ -309,7 +333,7 @@ export function Icon({ name, size = 22, color }: { name: IconName; size?: number
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   highlight: { position: 'absolute', left: 0, right: 0, top: 0, height: '42%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   chromeButton: {
@@ -321,6 +345,13 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     boxShadow: '0 2px 4px rgba(27,21,48,0.18)',
   },
   chromeButtonText: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: colors.ink },
+  bevelPressed: {
+    borderWidth: 1,
+    borderTopColor: '#121318',
+    borderLeftColor: '#121318',
+    borderRightColor: '#7A809A',
+    borderBottomColor: '#7A809A',
+  },
   lcd: {
     backgroundColor: colors.lcdBg,
     borderRadius: 6,

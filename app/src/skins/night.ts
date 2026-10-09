@@ -25,6 +25,8 @@ export const night: Skin = {
     okBg: 'rgba(155,255,58,0.14)',
     okBorder: 'rgba(155,255,58,0.45)',
     limeAccent: '#9BFF3A',
+    nameText: '#ECE8FF',
+    fieldText: '#ECE8FF',
     chromeEdge: '#4A4566',
     readTick: '#3FD8F5',
     screen: '#0E0A1C',
@@ -37,6 +39,7 @@ export const night: Skin = {
     sidebar: 'rgba(0,0,0,0.25)',
     divider: 'rgba(185,155,255,0.2)',
   },
+  roles: { ...y2k.roles, negative: { grad: ['#4A4566', '#2E2A44'], text: '#ECE8FF' } },
   chrome: {
     colors: ['#4A4566', '#2E2A44', '#1B1530', '#2A2640', '#3A3556'],
     locations: [0, 0.4, 0.52, 0.75, 1],
@@ -49,7 +52,7 @@ export const night: Skin = {
     { offset: 1, color: '#FFFFFF' },
   ],
   logoShadow: '#000000',
-  background: { gradient: ['#1E1838', '#0B0816'], grid: 'rgba(63,216,245,0.08)' },
+  background: { kind: 'grid', gradient: ['#1E1838', '#0B0816'], line: 'rgba(63,216,245,0.08)' },
   copy: {
     ...y2k.copy,
     loginButton: 'Выйти в ночной эфир',

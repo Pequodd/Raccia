@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError } from '../api';
 import { parseInvite } from '../config';
+import { PlayerHero } from '../components/heroes';
 import { ChromeLogo, Plastic, stickers } from '../components/y2k';
 import { makeStyles, useSkin } from '../skins';
 import { diagonal } from '../y2k';
@@ -30,7 +31,7 @@ export function AuthScreen({
   initialInvite?: string | null;
 }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<'login' | 'register'>(initialInvite ? 'register' : 'login');
@@ -97,18 +98,23 @@ export function AuthScreen({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.column}>
-          <View style={styles.ball}>
-            <LinearGradient colors={plastic.ball} {...diagonal} style={StyleSheet.absoluteFill} />
-            <Image source={stickers.idea} style={styles.ballOleg} contentFit="contain" />
-            <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} style={styles.ballShine} pointerEvents="none" />
-            <View style={styles.ballShade} pointerEvents="none" />
-          </View>
-
-          <View style={styles.logo}>
-            <ChromeLogo size={58} />
-          </View>
+          {skin.hero === 'player' ? (
+            <PlayerHero />
+          ) : (
+            <>
+              <View style={styles.ball}>
+                <LinearGradient colors={skin.ball} {...diagonal} style={StyleSheet.absoluteFill} />
+                <Image source={stickers.idea} style={styles.ballOleg} contentFit="contain" />
+                <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} style={styles.ballShine} pointerEvents="none" />
+                <View style={styles.ballShade} pointerEvents="none" />
+              </View>
+              <View style={styles.logo}>
+                <ChromeLogo size={58} />
+              </View>
+            </>
+          )}
           <Text style={styles.slogan}>{skin.copy.slogan}</Text>
-          <Plastic colors={plastic.lime} radius={18} style={styles.promo} shadow="0 6px 16px rgba(124,194,30,0.45)">
+          <Plastic colors={roles.promo.grad} radius={18} style={styles.promo} shadow="0 6px 16px rgba(124,194,30,0.45)">
             <Text style={styles.promoTitle}>{skin.copy.promise}</Text>
             <Text style={styles.promoProof}>{skin.copy.promiseProof}</Text>
           </Plastic>
@@ -172,7 +178,7 @@ export function AuthScreen({
           ) : null}
 
           <Plastic
-            colors={plastic.tangerine}
+            colors={roles.cta.grad}
             style={styles.button}
             shadow="0 6px 14px rgba(255,122,0,0.35)"
             onPress={submit}
@@ -180,7 +186,7 @@ export function AuthScreen({
             accessibilityLabel={mode === 'login' ? skin.copy.loginButton : skin.copy.registerButton}
           >
             {busy ? (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={roles.cta.text} />
             ) : (
               <Text style={styles.buttonText}>{mode === 'login' ? skin.copy.loginButton : skin.copy.registerButton}</Text>
             )}
@@ -214,7 +220,7 @@ export function AuthScreen({
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   root: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 26, justifyContent: 'center' },
   column: { width: '100%', maxWidth: 360, alignSelf: 'center', alignItems: 'stretch' },
@@ -240,7 +246,7 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     boxShadow: 'inset 0 3px 0 rgba(255,255,255,0.6), inset 0 -14px 26px rgba(0,50,70,0.4)',
   },
   logo: { alignItems: 'center', marginTop: 10 },
-  slogan: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center', marginTop: 2 },
+  slogan: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center', marginTop: 8 },
   fields: { gap: 12, marginTop: 22 },
   label: {
     fontFamily: fonts.mono,
@@ -260,8 +266,9 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.12)',
     fontFamily: fonts.bodyBold,
     fontSize: 17,
-    color: colors.ink,
+    color: colors.fieldText,
     outlineWidth: 0,
+    ...frames.field,
   },
   inputFocus: {
     backgroundColor: colors.fieldFocus,
@@ -269,7 +276,7 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     borderColor: colors.focus,
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.12), 0 0 0 4px rgba(0,170,205,0.2)',
   },
-  inputError: { borderColor: plastic.pink[1] },
+  inputError: { borderColor: colors.dangerBorder },
   problem: {
     marginTop: 16,
     borderRadius: 16,
@@ -285,7 +292,7 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   buttonText: {
     fontFamily: fonts.display,
     fontSize: 20,
-    color: colors.white,
+    color: roles.cta.text,
     textShadowColor: 'rgba(130,50,0,0.7)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -303,6 +310,6 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     alignItems: 'center',
     transform: [{ rotate: '-2.5deg' }],
   },
-  promoTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 25, color: colors.limeText, textAlign: 'center' },
-  promoProof: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: colors.limeText, textAlign: 'center', marginTop: 4 },
+  promoTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 25, color: roles.promo.text, textAlign: 'center' },
+  promoProof: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: roles.promo.text, textAlign: 'center', marginTop: 4 },
 }));

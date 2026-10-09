@@ -1,6 +1,3 @@
-import { Exo2_800ExtraBold_Italic } from '@expo-google-fonts/exo-2';
-import { Nunito_400Regular, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
-import { PTMono_400Regular } from '@expo-google-fonts/pt-mono';
 import { Image } from 'expo-image';
 import { useFonts } from 'expo-font';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,7 +7,8 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, useWindowDime
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, ApiError, setAuthToken } from './src/api';
 import { Chrome, ChromeButton, ChromeLogo, GridBackground, Icon, Lollipop, Plastic, stickers } from './src/components/y2k';
-import { makeStyles, SkinProvider, useSkin } from './src/skins';
+import { makeStyles, radius, SkinProvider, useSkin } from './src/skins';
+import { skinFonts } from './src/skins/fonts';
 import { ProfileScreen, SettingsScreen } from './src/screens/AccountScreens';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ChatListScreen, SearchField, type NewChatMode } from './src/screens/ChatListScreen';
@@ -47,15 +45,9 @@ export default function App() {
 
 function Root() {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
-  const [fontsLoaded] = useFonts({
-    Exo2_800ExtraBold_Italic,
-    Nunito_400Regular,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
-    PTMono_400Regular,
-  });
+  const [fontsLoaded] = useFonts(skinFonts);
   const [booting, setBooting] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [offline, setOffline] = useState(false);
@@ -123,14 +115,14 @@ function Root() {
 
 function Offline({ onRetry, onLogout }: { onRetry: () => void; onLogout: () => void }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
     <View style={[styles.center, { gap: 14, padding: 24 }]}>
       <Image source={stickers.sleep} style={{ width: 200, height: 200 }} contentFit="contain" />
       <Text style={styles.offlineTitle}>{skin.copy.noSignal.split('.')[0]}</Text>
       <Text style={styles.offlineText}>Ищем спутник… Сервер Олега не отвечает.</Text>
-      <Plastic colors={plastic.bondi} style={styles.offlineButton} onPress={onRetry} accessibilityLabel="Повторить">
+      <Plastic colors={roles.action.grad} style={styles.offlineButton} onPress={onRetry} accessibilityLabel="Повторить">
         <Text style={styles.offlineButtonText}>Повторить</Text>
       </Plastic>
       <ChromeButton label={skin.copy.logout} onPress={onLogout} />
@@ -142,7 +134,7 @@ type Tab = 'chats' | 'profile' | 'settings';
 
 function Messenger({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const [activeChatId, setActiveChat] = useState<number | null>(null);
   return (
@@ -154,7 +146,7 @@ function Messenger({ session, onLogout }: { session: Session; onLogout: () => vo
 
 function Shell({ onLogout }: { onLogout: () => void }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE_BREAKPOINT;
@@ -189,8 +181,14 @@ function Shell({ onLogout }: { onLogout: () => void }) {
     return (
       <View style={styles.wideOuter}>
         <View style={styles.imac}>
-          <LinearGradient colors={plastic.bondi} {...diagonal} style={[StyleSheet.absoluteFill, { borderRadius: 30 }]} />
-          <LinearGradient colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0)']} style={styles.imacShine} />
+          {skin.shape.kind === 'glossy' ? (
+            <>
+              <LinearGradient colors={roles.selected.grad} {...diagonal} style={[StyleSheet.absoluteFill, { borderRadius: radius(skin, 30) }]} />
+              <LinearGradient colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0)']} style={styles.imacShine} />
+            </>
+          ) : (
+            <LinearGradient colors={chrome.colors} locations={chrome.locations} style={[StyleSheet.absoluteFill, skin.frames.panel]} />
+          )}
           <View style={styles.screen}>
             <GridBackground />
             <Chrome style={styles.toolbar}>
@@ -244,7 +242,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
 function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const items: { key: Tab; label: string; icon: 'chat' | 'person' | 'settings' }[] = [
@@ -259,8 +257,8 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
         return (
           <Pressable key={it.key} style={styles.tab} onPress={() => onTab(it.key)} accessibilityRole="tab" accessibilityLabel={it.label}>
             {on ? (
-              <Plastic colors={plastic.bondi} style={styles.tabCapsule} radius={15}>
-                <Icon name={it.icon} size={20} color={colors.white} />
+              <Plastic colors={roles.tab.grad} style={styles.tabCapsule} radius={15}>
+                <Icon name={it.icon} size={20} color={roles.tab.text} />
               </Plastic>
             ) : (
               <View style={styles.tabCapsule}>
@@ -275,13 +273,13 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   root: { flex: 1, backgroundColor: colors.screen },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   offlineTitle: { fontFamily: fonts.display, fontSize: 30, color: colors.ink },
   offlineText: { fontFamily: fonts.body, fontSize: 15, color: colors.text2, textAlign: 'center' },
   offlineButton: { height: 48, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
-  offlineButtonText: { fontFamily: fonts.display, fontSize: 18, color: colors.white },
+  offlineButtonText: { fontFamily: fonts.display, fontSize: 18, color: roles.action.text },
   wideOuter: { flex: 1, padding: 16 },
   imac: { flex: 1, borderRadius: 30, padding: 14, boxShadow: '0 18px 40px rgba(0,112,138,0.35)' },
   imacShine: { position: 'absolute', left: 0, right: 0, top: 0, height: 60, borderTopLeftRadius: 30, borderTopRightRadius: 30 },

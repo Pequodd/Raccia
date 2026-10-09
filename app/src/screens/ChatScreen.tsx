@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../components/y2k';
-import { makeStyles, useSkin } from '../skins';
+import { makeStyles, radius, useSkin } from '../skins';
 import { useMessenger } from '../store';
 import type { Message, PendingMessage } from '../types';
 import { authorColor, clockTime, dayLabel, diagonal, plural } from '../y2k';
@@ -30,7 +30,7 @@ type Row =
 
 export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: () => void; wide: boolean }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { chats, messages, pending, me, typing, loadMessages, sendMessage, retryMessage, markRead, notifyTyping } =
@@ -189,7 +189,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
                   {m.id === lastMine ? `${skin.copy.ticks[ticks - 1]} · ` : ''}
                   {clockTime(m.createdAt)}
                 </Text>
-                <Ticks count={ticks} color={colors.mineMeta} />
+                <Ticks count={ticks} color={skin.bubbles.mine.meta} />
               </View>
             </Bubble>
           );
@@ -265,7 +265,7 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
             maxLength={4000}
           />
           <Plastic
-            colors={plastic.bondi}
+            colors={roles.action.grad}
             style={styles.send}
             onPress={submit}
             disabled={!text.trim()}
@@ -292,25 +292,33 @@ function Bubble({
   children: React.ReactNode;
 }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
+  const r = (v: number) => radius(skin, v);
   const corners = mine
-    ? { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: tail ? 6 : 20 }
-    : { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomRightRadius: 20, borderBottomLeftRadius: tail ? 6 : 20 };
+    ? { borderTopLeftRadius: r(20), borderTopRightRadius: r(20), borderBottomLeftRadius: r(20), borderBottomRightRadius: r(tail ? 6 : 20) }
+    : { borderTopLeftRadius: r(20), borderTopRightRadius: r(20), borderBottomRightRadius: r(20), borderBottomLeftRadius: r(tail ? 6 : 20) };
+  const look = mine ? skin.bubbles.mine : skin.bubbles.theirs;
+  const shine = skin.bubbles.shine;
   return (
     <View style={[styles.bubbleRow, { justifyContent: mine ? 'flex-end' : 'flex-start' }]}>
       <View
         style={[
           styles.bubble,
           corners,
-          mine ? styles.bubbleMineShadow : styles.bubbleTheirsShadow,
+          shine ? (mine ? styles.bubbleMineShadow : styles.bubbleTheirsShadow) : { boxShadow: 'none' },
+          look.border ? { borderWidth: 1, borderColor: look.border } : null,
           failed && styles.bubbleFailed,
         ]}
       >
         <View style={[StyleSheet.absoluteFill, corners, { overflow: 'hidden' }]} pointerEvents="none">
-          <LinearGradient colors={mine ? plastic.bubbleMine : plastic.bubbleTheirs} {...diagonal} style={StyleSheet.absoluteFill} />
-          <LinearGradient colors={['rgba(255,255,255,0.4)', 'rgba(255,255,255,0)']} style={styles.bubbleShine} />
-          <View style={[StyleSheet.absoluteFill, corners, styles.bubbleInset]} />
+          <LinearGradient colors={look.grad} {...(shine ? diagonal : {})} style={StyleSheet.absoluteFill} />
+          {shine ? (
+            <>
+              <LinearGradient colors={['rgba(255,255,255,0.4)', 'rgba(255,255,255,0)']} style={styles.bubbleShine} />
+              <View style={[StyleSheet.absoluteFill, corners, styles.bubbleInset]} />
+            </>
+          ) : null}
         </View>
         {children}
       </View>
@@ -318,7 +326,7 @@ function Bubble({
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   root: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
@@ -364,13 +372,13 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   },
   bubbleMineShadow: { boxShadow: '0 3px 8px rgba(255,122,0,0.25)' },
   bubbleTheirsShadow: { boxShadow: '0 3px 8px rgba(0,106,132,0.25)' },
-  bubbleFailed: { opacity: 0.7, borderWidth: 1.5, borderStyle: 'dashed', borderColor: plastic.pink[1], boxShadow: 'none' },
+  bubbleFailed: { opacity: 0.7, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.dangerBorder, boxShadow: 'none' },
   author: { fontFamily: fonts.bodyHeavy, fontSize: 12, marginBottom: 1 },
-  textTheirs: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.white },
-  textMine: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.mineText },
-  metaTheirs: { fontFamily: fonts.mono, fontSize: 10, color: 'rgba(255,255,255,0.8)', alignSelf: 'flex-end', marginTop: 1 },
+  textTheirs: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: bubbles.theirs.text },
+  textMine: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: bubbles.mine.text },
+  metaTheirs: { fontFamily: fonts.mono, fontSize: 10, color: bubbles.theirs.meta, alignSelf: 'flex-end', marginTop: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 1 },
-  metaMine: { fontFamily: fonts.mono, fontSize: 10, color: colors.mineMeta, alignSelf: 'flex-end' },
+  metaMine: { fontFamily: fonts.mono, fontSize: 10, color: bubbles.mine.meta, alignSelf: 'flex-end' },
   failRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3, alignSelf: 'flex-end' },
   failMark: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
   failMarkText: { color: colors.white, fontFamily: fonts.bodyHeavy, fontSize: 11 },
@@ -394,9 +402,10 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     boxShadow: 'inset 0 2px 4px rgba(27,21,48,0.1)',
     fontFamily: fonts.body,
     fontSize: 15,
-    color: colors.ink,
+    color: colors.fieldText,
     outlineWidth: 0,
+    ...frames.field,
   },
   send: { height: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  sendText: { fontFamily: fonts.display, fontSize: 15, color: colors.white },
+  sendText: { fontFamily: fonts.display, fontSize: 15, color: roles.action.text },
 }));

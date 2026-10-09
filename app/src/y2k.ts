@@ -18,9 +18,12 @@ export function initials(name: string) {
   return letters.toUpperCase();
 }
 
-// Dark text on light lollipops (lime), white elsewhere.
-export function avatarTextColor(gradient: Gradient, skin: Skin) {
-  return gradient[0] === skin.plastic.lime[0] ? skin.colors.limeText : skin.colors.white;
+// Dark text on pale lollipops, white on saturated ones (by perceived brightness).
+export function avatarTextColor(gradient: Gradient, _skin: Skin) {
+  const hex = gradient[0].replace('#', '');
+  if (hex.length !== 6) return '#FFFFFF';
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b > 186 ? '#1F3300' : '#FFFFFF';
 }
 
 // Pale author colours for names inside bubbles.

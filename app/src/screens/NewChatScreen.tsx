@@ -10,7 +10,7 @@ import type { NewChatMode } from './ChatListScreen';
 
 export function NewChatScreen({ mode, onClose, wide }: { mode: NewChatMode; onClose: () => void; wide: boolean }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { openDirect, createGroup, setActiveChat } = useMessenger();
@@ -130,7 +130,7 @@ export function NewChatScreen({ mode, onClose, wide }: { mode: NewChatMode; onCl
       {group ? (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <Plastic
-            colors={plastic.lime}
+            colors={roles.positive.grad}
             style={styles.create}
             onPress={submitGroup}
             disabled={!canCreate}
@@ -146,7 +146,7 @@ export function NewChatScreen({ mode, onClose, wide }: { mode: NewChatMode; onCl
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   root: { flex: 1 },
   header: { borderBottomWidth: 1, borderBottomColor: colors.chromeEdge, boxShadow: '0 2px 6px rgba(27,21,48,0.15)', zIndex: 2 },
   headerRow: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 10 },
@@ -161,8 +161,9 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     borderColor: colors.fieldBorder,
     fontFamily: fonts.bodyBold,
     fontSize: 16,
-    color: colors.ink,
+    color: colors.fieldText,
     outlineWidth: 0,
+    ...frames.field,
   },
   search: {
     height: 38,
@@ -174,8 +175,9 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     backgroundColor: colors.field,
     borderWidth: 1,
     borderColor: colors.fieldBorderSoft,
+    ...frames.field,
   },
-  searchInput: { flex: 1, height: 36, fontFamily: fonts.body, fontSize: 14, color: colors.ink, outlineWidth: 0 },
+  searchInput: { flex: 1, height: 36, fontFamily: fonts.body, fontSize: 14, color: colors.fieldText, outlineWidth: 0 },
   error: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.dangerText },
   list: { paddingHorizontal: 12, paddingBottom: 16, gap: 6 },
   card: {
@@ -188,6 +190,7 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
+    ...frames.card,
   },
   cardOn: { borderColor: colors.limeAccent, backgroundColor: colors.okBg },
   name: { fontFamily: fonts.bodyHeavy, fontSize: 15, color: colors.ink },
@@ -198,5 +201,5 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   empty: { fontFamily: fonts.body, fontSize: 14, color: colors.text3, textAlign: 'center', padding: 24 },
   footer: { paddingHorizontal: 12, paddingTop: 8 },
   create: { height: 52, alignItems: 'center', justifyContent: 'center' },
-  createText: { fontFamily: fonts.display, fontSize: 18, color: colors.limeText },
+  createText: { fontFamily: fonts.display, fontSize: 18, color: roles.positive.text },
 }));

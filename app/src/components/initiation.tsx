@@ -27,12 +27,12 @@ function countdown(endsAt: number, now: number) {
 
 function GrapeCard({ children }: { children: React.ReactNode }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   return (
     <View style={styles.card}>
       <View style={[StyleSheet.absoluteFill, styles.cardClip]} pointerEvents="none">
-        <LinearGradient colors={plastic.vote} {...diagonal} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={roles.vote.grad} {...diagonal} style={StyleSheet.absoluteFill} />
         <LinearGradient colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0)']} style={styles.cardShine} />
       </View>
       {children}
@@ -42,7 +42,7 @@ function GrapeCard({ children }: { children: React.ReactNode }) {
 
 function Tally({ vote }: { vote: Vote }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const total = vote.yes + vote.no + vote.thinking || 1;
   return (
@@ -62,7 +62,7 @@ function Tally({ vote }: { vote: Vote }) {
 // «НОВЫЙ АБОНЕНТ!» — shown to everyone while a newcomer's vote runs.
 export function VoteCard({ vote }: { vote: Vote }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const now = useNow();
   const { castVote } = useMessenger();
@@ -107,8 +107,8 @@ export function VoteCard({ vote }: { vote: Vote }) {
         </View>
       ) : (
         <View style={styles.buttons}>
-          <Plastic colors={plastic.lime} style={styles.button} onPress={() => cast('for')} disabled={busy} accessibilityLabel="Впустить">
-            <Text style={[styles.buttonText, { color: colors.limeText }]}>{skin.copy.voteFor}</Text>
+          <Plastic colors={roles.positive.grad} style={styles.button} onPress={() => cast('for')} disabled={busy} accessibilityLabel="Впустить">
+            <Text style={[styles.buttonText, { color: roles.positive.text }]}>{skin.copy.voteFor}</Text>
           </Plastic>
           <ChromeButton label={skin.copy.voteAgainst} onPress={() => cast('against')} disabled={busy} style={styles.button} />
         </View>
@@ -121,7 +121,7 @@ export function VoteCard({ vote }: { vote: Vote }) {
 // What the newcomer sees while the others decide.
 export function CandidateCard({ vote }: { vote: Vote | undefined }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const now = useNow();
   const { me } = useMessenger();
@@ -145,7 +145,7 @@ export function CandidateCard({ vote }: { vote: Vote | undefined }) {
 
 export function ResultCard({ result }: { result: VoteResult }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const { me, dismissResult } = useMessenger();
   const mine = result.candidateId === me.id;
@@ -171,7 +171,7 @@ export function ResultCard({ result }: { result: VoteResult }) {
 // «Выдать инвайт»: a one-time link to share.
 export function InviteCard({ onClose }: { onClose: () => void }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -217,7 +217,7 @@ export function InviteCard({ onClose }: { onClose: () => void }) {
         </Text>
       </View>
       <View style={styles.buttons}>
-        <Plastic colors={plastic.bondi} style={styles.button} onPress={share} disabled={!link} accessibilityLabel="Поделиться">
+        <Plastic colors={roles.action.grad} style={styles.button} onPress={share} disabled={!link} accessibilityLabel="Поделиться">
           <Text style={styles.buttonText}>Поделиться</Text>
         </Plastic>
         <ChromeButton label={copied ? 'Скопировано ✓' : 'Скопировать'} onPress={copy} disabled={!link} style={styles.button} />
@@ -226,7 +226,7 @@ export function InviteCard({ onClose }: { onClose: () => void }) {
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   card: {
     borderRadius: 20,
     paddingHorizontal: 14,
@@ -239,10 +239,10 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   cardClip: { borderRadius: 20, overflow: 'hidden' },
   cardShine: { position: 'absolute', left: 0, right: 0, top: 0, height: '40%' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontFamily: fonts.display, fontSize: 16, color: colors.white },
-  close: { color: colors.white, fontFamily: fonts.bodyHeavy, fontSize: 16 },
+  title: { fontFamily: fonts.display, fontSize: 16, color: roles.vote.text },
+  close: { color: roles.vote.text, fontFamily: fonts.bodyHeavy, fontSize: 16 },
   candidate: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  candidateName: { fontFamily: fonts.bodyHeavy, fontSize: 15, color: colors.white },
+  candidateName: { fontFamily: fonts.bodyHeavy, fontSize: 15, color: roles.vote.text },
   candidateMeta: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   bar: { height: 8, borderRadius: 4, flexDirection: 'row', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.25)' },
   barYes: { backgroundColor: colors.neon, boxShadow: `0 0 6px ${colors.neonGlow}` },
@@ -251,8 +251,8 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   note: { fontFamily: fonts.bodyBold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   buttons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   button: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: colors.white },
-  myVote: { flex: 1, fontFamily: fonts.bodyHeavy, fontSize: 14, color: colors.white },
+  buttonText: { fontFamily: fonts.bodyHeavy, fontSize: 14, color: roles.action.text },
+  myVote: { flex: 1, fontFamily: fonts.bodyHeavy, fontSize: 14, color: roles.vote.text },
   error: { fontFamily: fonts.bodyBold, fontSize: 12, color: '#FFC6F2' },
   linkBox: {
     backgroundColor: colors.lcdBg,

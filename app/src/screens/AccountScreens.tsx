@@ -10,7 +10,7 @@ import { useMessenger } from '../store';
 
 function Page({ title, wide, children }: { title: string; wide: boolean; children: ReactNode }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
@@ -27,7 +27,7 @@ function Page({ title, wide, children }: { title: string; wide: boolean; childre
 
 export function ProfileScreen({ wide }: { wide: boolean }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const { me, setMe, connected } = useMessenger();
   const initiated = me.status === 'initiated';
@@ -94,8 +94,8 @@ export function ProfileScreen({ wide }: { wide: boolean }) {
             ))}
           </View>
           {notice ? <Text style={[styles.notice, !notice.ok && { color: colors.dangerText }]}>{notice.text}</Text> : null}
-          <Plastic colors={plastic.bondi} style={styles.save} onPress={save} disabled={busy || !dirty || !name.trim()} accessibilityLabel="Сохранить">
-            <Text style={styles.logoutText}>Сохранить</Text>
+          <Plastic colors={roles.action.grad} style={styles.save} onPress={save} disabled={busy || !dirty || !name.trim()} accessibilityLabel="Сохранить">
+            <Text style={[styles.logoutText, { color: roles.action.text }]}>Сохранить</Text>
           </Plastic>
         </View>
       ) : null}
@@ -105,7 +105,7 @@ export function ProfileScreen({ wide }: { wide: boolean }) {
 
 export function SettingsScreen({ onLogout, wide }: { onLogout: () => void; wide: boolean }) {
   const skin = useSkin();
-  const { colors, plastic, fonts, chrome } = skin;
+  const { colors, roles, fonts, chrome } = skin;
   const styles = useStyles();
   const { setSkin } = useSkinSwitcher();
   return (
@@ -126,8 +126,8 @@ export function SettingsScreen({ onLogout, wide }: { onLogout: () => void; wide:
               >
                 <View style={styles.skinPreview}>
                   <LinearGradient colors={s.background.gradient} style={StyleSheet.absoluteFill} />
-                  <LinearGradient colors={s.plastic.bubbleTheirs} {...diagonal} style={[styles.skinBubble, { left: 8, top: 10 }]} />
-                  <LinearGradient colors={s.plastic.bubbleMine} {...diagonal} style={[styles.skinBubble, { right: 8, top: 34 }]} />
+                  <LinearGradient colors={s.bubbles.theirs.grad} {...diagonal} style={[styles.skinBubble, { left: 8, top: 10 }]} />
+                  <LinearGradient colors={s.bubbles.mine.grad} {...diagonal} style={[styles.skinBubble, { right: 8, top: 34 }]} />
                 </View>
                 <Text style={styles.skinName}>
                   {on ? '✓ ' : ''}
@@ -140,8 +140,8 @@ export function SettingsScreen({ onLogout, wide }: { onLogout: () => void; wide:
       </View>
       <View style={styles.card}>
         <Text style={styles.row}>Уведомления — скоро, вместе с push.</Text>
-        <Plastic colors={plastic.danger} style={styles.logout} onPress={onLogout} accessibilityLabel={skin.copy.logout}>
-          <Text style={styles.logoutText}>{skin.copy.logout}</Text>
+        <Plastic colors={roles.danger.grad} style={styles.logout} onPress={onLogout} accessibilityLabel={skin.copy.logout}>
+          <Text style={[styles.logoutText, { color: roles.danger.text }]}>{skin.copy.logout}</Text>
         </Plastic>
       </View>
       <Text style={styles.footer}>ОЛЕГ v0.1 · {skin.copy.footer}</Text>
@@ -154,7 +154,7 @@ export function SettingsScreen({ onLogout, wide }: { onLogout: () => void; wide:
   );
 }
 
-const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
+const useStyles = makeStyles(({ colors, fonts, roles, frames, bubbles }) => ({
   root: { flex: 1 },
   header: { borderBottomWidth: 1, borderBottomColor: colors.chromeEdge, boxShadow: '0 2px 6px rgba(27,21,48,0.15)', zIndex: 2 },
   headerRow: { height: 56, alignItems: 'center', justifyContent: 'center' },
@@ -170,6 +170,7 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     boxShadow: '0 2px 6px rgba(27,21,48,0.08)',
+    ...frames.card,
   },
   name: { fontFamily: fonts.display, fontSize: 28, color: colors.ink },
   nick: { fontFamily: fonts.mono, fontSize: 12, color: colors.text4, marginTop: -8 },
@@ -183,8 +184,9 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
     borderColor: colors.fieldBorder,
     fontFamily: fonts.bodyBold,
     fontSize: 17,
-    color: colors.ink,
+    color: colors.fieldText,
     outlineWidth: 0,
+    ...frames.field,
   },
   avatars: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   avatarCell: { padding: 3, borderRadius: 32, borderWidth: 2, borderColor: 'transparent' },
@@ -200,6 +202,6 @@ const useStyles = makeStyles(({ colors, fonts, plastic }) => ({
   note: { fontFamily: fonts.body, fontSize: 13, color: colors.text3, textAlign: 'center' },
   row: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text2, alignSelf: 'stretch' },
   logout: { height: 48, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
-  logoutText: { fontFamily: fonts.display, fontSize: 18, color: colors.white },
+  logoutText: { fontFamily: fonts.display, fontSize: 18, color: roles.action.text },
   footer: { fontFamily: fonts.mono, fontSize: 11, color: colors.text4, textAlign: 'center' },
 }));
