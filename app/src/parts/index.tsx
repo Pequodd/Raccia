@@ -20,6 +20,7 @@ export type ChatRowProps = {
   avatar: string | null;
   selected: boolean;
   onPress: () => void;
+  onLongPress: () => void; // delete the chat
 };
 
 export type ListHeaderProps = {

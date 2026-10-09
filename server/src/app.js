@@ -90,6 +90,9 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
     invitedCount: db.prepare('SELECT COUNT(*) AS n FROM users WHERE invited_by = ?'),
     chatInfo: db.prepare('SELECT type, title FROM chats WHERE id = ?'),
     setMedia: db.prepare('UPDATE messages SET media = ? WHERE id = ?'),
+    chatMedia: db.prepare("SELECT media FROM messages WHERE chat_id = ? AND media IS NOT NULL AND kind IN ('image', 'video', 'voice', 'circle')"),
+    fileUsedElsewhere: db.prepare('SELECT 1 FROM messages WHERE chat_id != ? AND media LIKE ? LIMIT 1'),
+    deleteChat: db.prepare('DELETE FROM chats WHERE id = ?'),
     initiatedIds: db.prepare("SELECT id FROM users WHERE status = 'initiated'"),
     allIds: db.prepare('SELECT id FROM users'),
     candidates: db.prepare("SELECT id FROM users WHERE status = 'candidate'"),
@@ -874,6 +877,32 @@ export function createServer(db, { voteMs = VOTE_MS, uploadDir, push: pushOption
       )
     );
     res.status(201).json({ messages });
+  });
+
+  // Delete a chat for everyone, without a trace: messages, cards, members, and the files
+  // of its attachments (unless a forwarded copy still lives in another chat).
+  app.post('/api/chats/:id/delete', requireAuth, requireMember, (req, res) => {
+    const chatId = req.chatId;
+    const members = memberIds(chatId);
+    const files = new Set();
+    for (const { media } of q.chatMedia.all(chatId)) {
+      const m = JSON.parse(media);
+      for (const f of [m.file, m.poster]) if (f && !q.fileUsedElsewhere.get(chatId, `%"${f}"%`)) files.add(f);
+    }
+    conferences.endForChat(chatId);
+    q.deleteChat.run(chatId); // messages, members, meetups go with it (ON DELETE CASCADE)
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    if (uploadDir) {
+      for (const f of files) {
+        try {
+          unlinkSync(join(uploadDir, f));
+        } catch {
+          // already gone
+        }
+      }
+    }
+    for (const uid of members) send(uid, { type: 'chat_deleted', chatId });
+    res.json({ ok: true });
   });
 
   app.post('/api/chats/:id/read', requireAuth, requireMember, (req, res) => {

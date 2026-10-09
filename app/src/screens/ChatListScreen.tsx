@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { messagePreview } from '../media/upload';
 import { useParts } from '../parts';
 import { ConferenceSheet } from '../calls/ConferenceScreen';
+import { ChatDeleteSheet } from '../components/chatDelete';
 import { useMessenger } from '../store';
 import type { Chat } from '../types';
 import { diagonal, formatTime } from '../y2k';
@@ -62,6 +63,7 @@ export function ChatListScreen({
   const visible = filterChats(chats, query);
   const [inviting, setInviting] = useState(false);
   const [conferencing, setConferencing] = useState(false);
+  const [deleting, setDeleting] = useState<Chat | null>(null);
   const otherVotes = Object.values(votes).filter((v) => v.candidate.id !== me.id);
   const parts = useParts();
 
@@ -93,6 +95,7 @@ export function ChatListScreen({
           avatar={other?.avatar ?? null}
           selected={selected}
           onPress={() => setActiveChat(item.id)}
+          onLongPress={() => setDeleting(item)}
         />
       );
     }
@@ -100,6 +103,8 @@ export function ChatListScreen({
     return (
       <Pressable
         onPress={() => setActiveChat(item.id)}
+        onLongPress={() => setDeleting(item)}
+        delayLongPress={450}
         style={({ pressed }) => [styles.card, selected && styles.cardSelected, pressed && { transform: [{ scale: 0.98 }] }]}
       >
         {selected ? (
@@ -141,6 +146,7 @@ export function ChatListScreen({
   return (
     <View style={styles.root}>
       <ConferenceSheet visible={conferencing} onClose={() => setConferencing(false)} />
+      <ChatDeleteSheet chat={deleting} onClose={() => setDeleting(null)} />
       {wide ? null : parts.ListHeader ? (
         <parts.ListHeader
           myName={me.name}

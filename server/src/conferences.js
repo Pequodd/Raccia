@@ -129,5 +129,14 @@ export function createConferences(deps) {
     leave(userId);
   }
 
-  return { handle, onOffline, live, MAX_PARTICIPANTS };
+  // The chat is being deleted: everyone out, no card to update.
+  function endForChat(chatId) {
+    for (const conf of [...confs.values()]) {
+      if (conf.chatId !== chatId) continue;
+      conf.messageId = null;
+      for (const uid of [...conf.people.keys()]) leave(uid);
+    }
+  }
+
+  return { handle, onOffline, live, endForChat, MAX_PARTICIPANTS };
 }

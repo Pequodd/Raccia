@@ -104,9 +104,9 @@ function ListHeader({ myName, myAvatar, query, onQuery, onNewChat, topInset }: L
   );
 }
 
-function ChatRow({ index, title, preview, typing, time, unread, isNew, online, avatar, selected, onPress }: ChatRowProps) {
+function ChatRow({ index, title, preview, typing, time, unread, isNew, online, avatar, selected, onPress, onLongPress }: ChatRowProps) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [s.row, selected && s.rowSelected, pressed && { backgroundColor: '#2A2D38' }]}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={450} style={({ pressed }) => [s.row, selected && s.rowSelected, pressed && { backgroundColor: '#2A2D38' }]}>
       <Text style={s.rowNum}>{index + 1}.</Text>
       <Tile name={title} avatar={avatar} size={42} color={tileColor(title)} online={online} />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

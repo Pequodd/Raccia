@@ -101,3 +101,27 @@ test('attachments: photo, video, voice, circle', async () => {
   assert.equal(chat.lastMessage.kind, 'circle');
   assert.equal(chat.unread, 4); // the four attachments; the service line does not count
 });
+
+test('deleting a chat removes it for everyone, with its files', async () => {
+  const login = async (u) =>
+    (await fetch(base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: 'secret1' }) })).json();
+  const a = await login('alice');
+  const b = await login('bob');
+  const chat = (await json('/api/chats', b.token)).chats.find((c) => c.type === 'direct');
+  const before = readdirSync(join(uploadDir, 'm'));
+  const kept = (await json(`/api/chats/${chat.id}/messages`, b.token)).messages.find((m) => m.kind === 'image');
+  // A forwarded copy elsewhere keeps its file alive.
+  const group = (await json('/api/chats/group', a.token, { title: 'Архив', memberIds: [] })).chat.id;
+  await json(`/api/messages/${kept.id}/forward`, a.token, { chatIds: [group] });
+
+  const r = await json(`/api/chats/${chat.id}/delete`, b.token, {});
+  assert.equal(r.ok, true);
+  assert.equal((await json('/api/chats', a.token)).chats.some((c) => c.id === chat.id), false);
+  assert.equal((await fetch(`${base}/api/chats/${chat.id}/messages`, { headers: { Authorization: `Bearer ${a.token}` } })).status, 404);
+  const after = readdirSync(join(uploadDir, 'm'));
+  assert.ok(after.length < before.length);
+  assert.ok(after.includes(kept.media.file.slice(2)), 'the forwarded photo stays');
+  // A new direct chat can be opened again.
+  const again = await json('/api/chats/direct', a.token, { userId: b.user.id });
+  assert.ok(again.chat.id !== chat.id);
+});

@@ -127,6 +127,7 @@ export type ServerEvent =
   | { type: 'presence'; userId: number; online: boolean }
   | { type: 'meetup'; chatId: number; message: Message }
   | { type: 'message_update'; chatId: number; message: Message }
+  | { type: 'chat_deleted'; chatId: number }
   | CallEvent
   | ConfEvent
   | { type: 'vote'; vote: Vote }

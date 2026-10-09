@@ -29,6 +29,7 @@ type Action =
   | { type: 'pendingDrop'; chatId: number; tempId: string }
   | { type: 'pendingProgress'; chatId: number; tempId: string; progress: number }
   | { type: 'replaceMessage'; message: Message }
+  | { type: 'removeChat'; chatId: number }
   | { type: 'typing'; chatId: number; name: string }
   | { type: 'votes'; votes: Vote[] }
   | { type: 'vote'; vote: Vote }
@@ -139,6 +140,12 @@ function reducer(state: State, action: Action): State {
         : state.messages;
       const chats = state.chats.map((c) => (c.lastMessage?.id === message.id ? { ...c, lastMessage: message } : c));
       return { ...state, messages, chats };
+    }
+
+    case 'removeChat': {
+      const { [action.chatId]: _m, ...messages } = state.messages;
+      const { [action.chatId]: _p, ...pending } = state.pending;
+      return { ...state, chats: state.chats.filter((c) => c.id !== action.chatId), messages, pending };
     }
 
     case 'pendingProgress': {
@@ -338,6 +345,10 @@ export function MessengerProvider({
           break;
         case 'presence':
           dispatch({ type: 'presence', userId: event.userId, online: event.online });
+          break;
+        case 'chat_deleted':
+          dispatch({ type: 'removeChat', chatId: event.chatId });
+          if (activeRef.current === event.chatId) setActiveChat(null);
           break;
         case 'meetup':
         case 'message_update':

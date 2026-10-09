@@ -8,6 +8,7 @@ export function openDb(file) {
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
+    PRAGMA secure_delete = ON; -- deleted chats are overwritten with zeros, not just unlinked
 
     CREATE TABLE IF NOT EXISTS users (
       id            INTEGER PRIMARY KEY,
