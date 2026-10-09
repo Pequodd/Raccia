@@ -20,7 +20,7 @@ import { UserCard } from '../components/profile';
 import { CircleRecorder } from '../media/CircleRecorder';
 import { AttachPreview, AttachSheet, RecordingBar, ToolButton } from '../media/ComposerTools';
 import { MediaContent, type MediaView } from '../media/MediaViews';
-import { pickAttachment, PickError } from '../media/pick';
+import { draftFromFile, pickAttachment, PickError } from '../media/pick';
 import { mediaUrl } from '../media/upload';
 import { useVoiceRecorder } from '../media/useVoiceRecorder';
 import { Chrome, ChromeButton, Icon, Lollipop, Plastic, Ticks } from '../components/y2k';
@@ -140,6 +140,15 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
     try {
       const picked = await pickAttachment(source);
       if (picked) setDraft(picked);
+    } catch (e) {
+      setError(e instanceof PickError ? e.message : 'Не получилось открыть файл. Попробуйте другой.');
+    }
+  }
+
+  async function pickFile(file: File) {
+    setError(null);
+    try {
+      setDraft(await draftFromFile(file));
     } catch (e) {
       setError(e instanceof PickError ? e.message : 'Не получилось открыть файл. Попробуйте другой.');
     }
@@ -368,7 +377,13 @@ export function ChatScreen({ chatId, onBack, wide }: { chatId: number; onBack?: 
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <AttachSheet visible={attaching} onPick={pick} onMeetup={() => setMeeting(true)} onClose={() => setAttaching(false)} />
+      <AttachSheet
+        visible={attaching}
+        onPick={pick}
+        onFile={pickFile}
+        onMeetup={() => setMeeting(true)}
+        onClose={() => setAttaching(false)}
+      />
       <MeetupSheet chatId={chatId} visible={meeting} onClose={() => setMeeting(false)} />
       <MessageActions message={acting} onForward={setForwarding} onClose={() => setActing(null)} />
       <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} />

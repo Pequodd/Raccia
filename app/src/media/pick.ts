@@ -2,6 +2,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import type { MediaDraft } from '../types';
+import { imageSize, videoInfo } from './WebFileInput';
 
 const MAX_SIDE = 1600; // photos are shrunk to this, like Telegram's «compressed» photos
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
@@ -49,6 +50,20 @@ export async function pickAttachment(source: 'library' | 'camera'): Promise<Medi
     return { kind: 'image', uri: asset.uri, blob: asset.file ?? undefined, mime: 'image/gif', width: asset.width, height: asset.height };
   }
   return shrinkPhoto(asset.uri, asset.width, asset.height);
+}
+
+// Web: a file the person picked through <input type="file">.
+export async function draftFromFile(file: File): Promise<MediaDraft> {
+  const uri = URL.createObjectURL(file);
+  if (file.type.startsWith('video/')) {
+    if (file.size > MAX_VIDEO_BYTES) throw new PickError('Видео больше 100 МБ. Обрежьте его или выберите покороче.');
+    const info = await videoInfo(uri);
+    return { kind: 'video', uri, blob: file, mime: file.type || 'video/mp4', ...info };
+  }
+  if (!file.type.startsWith('image/')) throw new PickError('Можно отправить фото или видео.');
+  const { width, height } = await imageSize(uri);
+  if (file.type === 'image/gif') return { kind: 'image', uri, blob: file, mime: 'image/gif', width, height };
+  return shrinkPhoto(uri, width, height);
 }
 
 async function shrinkPhoto(uri: string, width: number, height: number): Promise<MediaDraft> {

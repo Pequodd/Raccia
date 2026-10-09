@@ -7,6 +7,7 @@ import { makeStyles, skins, useSkin, useSkinSwitcher } from '../skins';
 import { diagonal } from '../y2k';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMessenger } from '../store';
+import { WebFileInput } from '../media/WebFileInput';
 import { InviteCard } from '../components/initiation';
 import { BarsAdmin } from '../components/meetup';
 import { NotificationSettings } from '../components/notify';
@@ -65,9 +66,9 @@ export function ProfileScreen({ wide }: { wide: boolean }) {
     }
   }
 
-  async function uploadPhoto() {
+  async function uploadPhoto(file?: File) {
     setNotice(null);
-    if (await photo.upload()) setNotice({ ok: true, text: 'Фото на месте ✓' });
+    if (await photo.upload(file)) setNotice({ ok: true, text: 'Фото на месте ✓' });
   }
 
   const shownName = initiated ? name || me.name : me.name;
@@ -122,9 +123,10 @@ export function ProfileScreen({ wide }: { wide: boolean }) {
                 <Lollipop name={shownName} size={52} avatar={me.photo} />
               </Pressable>
             ) : (
-              <Pressable onPress={uploadPhoto} style={[styles.avatarCell, styles.uploadCell]} accessibilityLabel="Загрузить фото">
+              <Pressable onPress={() => uploadPhoto()} style={[styles.avatarCell, styles.uploadCell]} accessibilityLabel="Загрузить фото">
                 <Text style={styles.uploadPlus}>+</Text>
                 <Text style={styles.uploadText}>Фото</Text>
+                <WebFileInput accept="image/*" label="Загрузить фото" onFile={uploadPhoto} />
               </Pressable>
             )}
             <Pressable onPress={() => setAvatar(null)} style={[styles.avatarCell, avatar === null && styles.avatarOn]} accessibilityLabel="Без аватара">

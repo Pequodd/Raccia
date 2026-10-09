@@ -7,6 +7,7 @@ import { makeStyles, useSkin } from '../skins';
 import type { MediaDraft } from '../types';
 import { formatDuration } from './circleUi';
 import { MediaContent } from './MediaViews';
+import { WebFileInput } from './WebFileInput';
 
 export type ToolIcon = 'attach' | 'mic' | 'circle' | 'camera' | 'gallery';
 
@@ -59,11 +60,13 @@ export function AttachSheet({
   visible,
   onPick,
   onMeetup,
+  onFile,
   onClose,
 }: {
   visible: boolean;
   onPick: (source: 'library' | 'camera') => void;
   onMeetup: () => void;
+  onFile: (file: File) => void; // web: picked through the real file input
   onClose: () => void;
 }) {
   const styles = useStyles();
@@ -94,6 +97,15 @@ export function AttachSheet({
               <Text style={styles.optionTitle}>{o.title}</Text>
               <Text style={styles.optionHint}>{o.hint}</Text>
             </View>
+            <WebFileInput
+              accept="image/*,video/*"
+              capture={o.source === 'camera' ? 'environment' : undefined}
+              label={o.title}
+              onFile={(file) => {
+                onClose();
+                onFile(file);
+              }}
+            />
           </Pressable>
         ))}
         <Pressable

@@ -7,6 +7,7 @@ import { makeStyles, useSkin } from '../skins';
 import { useMessenger } from '../store';
 import type { Profile, User } from '../types';
 import { plural } from '../y2k';
+import { WebFileInput } from '../media/WebFileInput';
 import { Lcd, Lollipop, Plastic } from './y2k';
 
 export function joinedLabel(ts: number) {
@@ -23,11 +24,11 @@ export function usePhotoUpload() {
   const skin = useSkin();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const upload = useCallback(async () => {
+  const upload = useCallback(async (file?: File) => {
     setError(null);
     let blob: Blob | null;
     try {
-      blob = await pickPhoto();
+      blob = await pickPhoto(file);
     } catch {
       setError('Не удалось открыть фото. Попробуйте другое.');
       return false;
@@ -49,14 +50,15 @@ export function usePhotoUpload() {
 }
 
 // Round camera button that sits on the avatar's corner.
-export function CameraButton({ onPress, busy, size = 38 }: { onPress: () => void; busy?: boolean; size?: number }) {
+export function CameraButton({ onPress, busy, size = 38 }: { onPress: (file?: File) => void; busy?: boolean; size?: number }) {
   const { roles } = useSkin();
   return (
+    <View style={{ width: size, height: size }}>
     <Plastic
       colors={roles.action.grad}
       radius={size / 2}
       style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
-      onPress={onPress}
+      onPress={() => onPress()}
       disabled={busy}
       accessibilityLabel="Загрузить фото"
     >
@@ -73,6 +75,8 @@ export function CameraButton({ onPress, busy, size = 38 }: { onPress: () => void
         </Svg>
       </View>
     </Plastic>
+    {busy ? null : <WebFileInput accept="image/*" label="Загрузить фото" onFile={onPress} />}
+    </View>
   );
 }
 
