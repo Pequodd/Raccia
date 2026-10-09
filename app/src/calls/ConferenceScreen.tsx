@@ -46,7 +46,7 @@ export function ConferenceScreen() {
   const { width } = useWindowDimensions();
   const [chatOpen, setChatOpen] = useState(false);
   const [cinema, setCinema] = useState(false);
-  const unseen = useUnseen(conf?.info.chatId ?? 0, chatOpen || cinema);
+  const unseen = useUnseen(chatOpen || cinema);
   const stageRef = useRef<View>(null);
   const [fullscreen, setFullscreen] = useState(false);
   useEffect(() => {
@@ -169,7 +169,7 @@ export function ConferenceScreen() {
         </View>
         {chatVisible ? (
           <View style={side ? styles.chatSide : styles.chatBottom}>
-            <ConfChat chatId={conf.info.chatId} onClose={() => (cinema ? setCinema(false) : setChatOpen(false))} />
+            <ConfChat onClose={() => (cinema ? setCinema(false) : setChatOpen(false))} />
           </View>
         ) : null}
       </View>

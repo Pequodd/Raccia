@@ -1,32 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { FlatList, Platform, Pressable, Text, TextInput, View, type NativeSyntheticEvent, type TextInputKeyPressEventData } from 'react-native';
-import { messagePreview } from '../media/upload';
 import { makeStyles, useSkin } from '../skins';
 import { useMessenger } from '../store';
 import { authorColor, clockTime } from '../y2k';
+import { useConference } from './ConferenceProvider';
 
-// The conference's own chat (the chat it was started in), in the dark call style.
-export function ConfChat({ chatId, onClose }: { chatId: number; onClose?: () => void }) {
+// The conference's own chat: only for the people in the room, gone when it ends.
+// (The chat the conference was started from stays as it was.)
+export function ConfChat({ onClose }: { onClose?: () => void }) {
   const styles = useStyles();
   const skin = useSkin();
-  const { messages, me, loadMessages, sendMessage, markRead } = useMessenger();
+  const { me } = useMessenger();
+  const { conf, sendChat } = useConference();
   const [text, setText] = useState('');
-  const bucket = messages[chatId];
-  const items = useMemo(() => [...(bucket?.items ?? [])].filter((m) => m.kind !== 'conference').slice(-80).reverse(), [bucket]);
-  const lastId = bucket?.items[bucket.items.length - 1]?.id;
-
-  useEffect(() => {
-    if (!bucket?.loaded) loadMessages(chatId).catch(() => {});
-  }, [chatId, bucket?.loaded, loadMessages]);
-  useEffect(() => {
-    if (lastId) markRead(chatId);
-  }, [chatId, lastId, markRead]);
+  const items = useMemo(() => [...(conf?.chat ?? [])].reverse(), [conf?.chat]);
 
   function send() {
-    const body = text.trim();
-    if (!body) return;
+    if (!text.trim()) return;
+    sendChat(text);
     setText('');
-    sendMessage(chatId, body);
   }
   function onKeyPress(e: NativeSyntheticEvent<TextInputKeyPressEventData>) {
     const ev = e.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean };
@@ -39,7 +31,7 @@ export function ConfChat({ chatId, onClose }: { chatId: number; onClose?: () => 
   return (
     <View style={styles.panel}>
       <View style={styles.head}>
-        <Text style={styles.headText}>Чат</Text>
+        <Text style={styles.headText}>Чат конференции</Text>
         {onClose ? (
           <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Скрыть чат">
             <Text style={styles.close}>✕</Text>
@@ -51,21 +43,17 @@ export function ConfChat({ chatId, onClose }: { chatId: number; onClose?: () => 
         data={items}
         keyExtractor={(m) => String(m.id)}
         contentContainerStyle={styles.list}
-        renderItem={({ item: m }) =>
-          m.kind === 'service' ? (
-            <Text style={styles.service}>{m.body}</Text>
-          ) : (
-            <View style={styles.msg}>
-              <Text style={styles.meta}>
-                <Text style={[styles.author, { color: m.userId === me.id ? '#9BE7FF' : authorColor(m.name, skin) }]}>{m.userId === me.id ? 'Я' : m.name}</Text>
-                {'  '}
-                {clockTime(m.createdAt)}
-              </Text>
-              <Text style={styles.body}>{m.kind === 'text' ? m.body : messagePreview(m)}</Text>
-            </View>
-          )
-        }
-        ListEmptyComponent={<Text style={styles.service}>Пишите сюда — увидят все в конференции.</Text>}
+        renderItem={({ item: m }) => (
+          <View style={styles.msg}>
+            <Text style={styles.meta}>
+              <Text style={[styles.author, { color: m.userId === me.id ? '#9BE7FF' : authorColor(m.name, skin) }]}>{m.userId === me.id ? 'Я' : m.name}</Text>
+              {'  '}
+              {clockTime(m.at)}
+            </Text>
+            <Text style={styles.body}>{m.text}</Text>
+          </View>
+        )}
+        ListEmptyComponent={<Text style={styles.empty}>Здесь переписка только этой конференции: её видят участники, и она исчезнет, когда все выйдут.</Text>}
       />
       <View style={styles.composer}>
         <TextInput
@@ -77,7 +65,7 @@ export function ConfChat({ chatId, onClose }: { chatId: number; onClose?: () => 
           placeholderTextColor="rgba(255,255,255,0.45)"
           multiline
           numberOfLines={Platform.OS === 'web' ? 1 : undefined}
-          maxLength={4000}
+          maxLength={2000}
         />
         <Pressable onPress={send} disabled={!text.trim()} style={[styles.send, !text.trim() && { opacity: 0.4 }]} accessibilityRole="button" accessibilityLabel="Отправить">
           <Text style={styles.sendText}>➤</Text>
@@ -87,13 +75,16 @@ export function ConfChat({ chatId, onClose }: { chatId: number; onClose?: () => 
   );
 }
 
-// How many messages came in while the panel was closed.
-export function useUnseen(chatId: number, open: boolean) {
-  const { messages, me } = useMessenger();
-  const items = messages[chatId]?.items ?? [];
-  const seen = useRef(items[items.length - 1]?.id ?? 0);
-  if (open) seen.current = items[items.length - 1]?.id ?? seen.current;
-  return items.filter((m) => m.id > seen.current && m.userId !== me.id && m.kind !== 'conference').length;
+// How many lines came in from others while the panel was closed.
+export function useUnseen(open: boolean) {
+  const { me } = useMessenger();
+  const { conf } = useConference();
+  const chat = conf?.chat ?? [];
+  const seen = useRef(0);
+  const lastId = chat[chat.length - 1]?.id ?? 0;
+  if (!conf) seen.current = 0;
+  else if (open) seen.current = lastId;
+  return chat.filter((m) => m.id > seen.current && m.userId !== me.id).length;
 }
 
 const useStyles = makeStyles(({ fonts }) => ({
@@ -101,12 +92,12 @@ const useStyles = makeStyles(({ fonts }) => ({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   headText: { fontFamily: fonts.bodyHeavy, fontSize: 16, color: '#FFFFFF' },
   close: { fontSize: 18, color: 'rgba(255,255,255,0.7)' },
-  list: { padding: 12, gap: 10 },
+  list: { padding: 12, gap: 10, flexGrow: 1 },
   msg: { gap: 1 },
   meta: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.45)' },
   author: { fontFamily: fonts.bodyBold, fontSize: 13 },
   body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 20, color: '#F2F0FA' },
-  service: { fontFamily: fonts.body, fontSize: 13, color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
+  empty: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 10 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
   input: {
     flex: 1,

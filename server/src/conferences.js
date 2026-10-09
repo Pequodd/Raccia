@@ -9,6 +9,9 @@ export const MAX_PARTICIPANTS = 8;
 // See calls.js: a blinking connection gets this long to say «conf_resume».
 const GRACE_MS = 15_000;
 const MAX_SIGNAL = 64 * 1024;
+// The conference's own chat: lives as long as the conference, for whoever is in it.
+const MAX_CHAT = 300;
+const MAX_CHAT_TEXT = 2000;
 
 // Events about being in a room go only to the connection someone joined from (another
 // open tab or phone of the same person must not react to them); invites go everywhere.
@@ -65,6 +68,7 @@ export function createConferences(deps) {
       type: 'conf_joined',
       conf: { id: conf.id, chatId: conf.chatId, video: conf.video, title: deps.chatTitle(conf.chatId, userId) },
       peers,
+      chat: conf.chat, // a latecomer sees what was said before
     });
     broadcastToConf(conf, { type: 'conf_peer_joined', confId: conf.id, peer: { ...deps.userCard(userId), screen: false } }, userId);
     deps.refreshCard(conf);
@@ -84,6 +88,8 @@ export function createConferences(deps) {
       startedAt: Date.now(),
       messageId: null,
       people: new Map(),
+      chat: [], // { id, userId, name, text, at }
+      chatSeq: 0,
     };
     confs.set(conf.id, conf);
     join(userId, conf, ws);
@@ -128,6 +134,16 @@ export function createConferences(deps) {
         if (conf.people.get(userId)?.ws !== ws || !conf.people.has(to) || !msg.data) return;
         if (JSON.stringify(msg.data).length > MAX_SIGNAL) return;
         toSeat(conf, to, { type: 'conf_signal', confId: conf.id, from: userId, data: msg.data });
+        break;
+      }
+      case 'conf_chat': {
+        const seat = conf.people.get(userId);
+        const text = typeof msg.text === 'string' ? msg.text.trim() : '';
+        if (!seat || seat.ws !== ws || !text) return;
+        const message = { id: ++conf.chatSeq, userId, name: deps.userCard(userId).name, text: text.slice(0, MAX_CHAT_TEXT), at: Date.now() };
+        conf.chat.push(message);
+        if (conf.chat.length > MAX_CHAT) conf.chat.shift();
+        broadcastToConf(conf, { type: 'conf_chat', confId: conf.id, message });
         break;
       }
       case 'conf_screen': {

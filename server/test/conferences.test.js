@@ -128,3 +128,28 @@ test('a stale seat from another tab does not close the new conference', async ()
   assert.equal((await tab2.next('conf_joined')).conf.id, second.conf.id);
   tab2.ws.close();
 });
+
+test('the conference has its own chat, not the chat it was started in', async () => {
+  const a = await api('/api/login', null, { username: 'anya', password: 'secret1' });
+  const b = await api('/api/login', null, { username: 'boris', password: 'secret1' });
+  const group = (await api('/api/chats', a.token)).chats.find((c) => c.type === 'group').id;
+  const A = connect(a.token), B = connect(b.token);
+  await Promise.all([A.open, B.open]);
+  A.send({ type: 'conf_start', chatId: group, video: false });
+  const confId = (await A.next('conf_joined')).conf.id;
+  A.send({ type: 'conf_chat', confId, text: 'Включай фильм!' });
+  assert.equal((await A.next('conf_chat')).message.text, 'Включай фильм!');
+
+  // A latecomer gets the history; the group chat itself stays untouched (only the card).
+  B.send({ type: 'conf_join', confId });
+  const joined = await B.next('conf_joined');
+  assert.deepEqual(joined.chat.map((m) => m.text), ['Включай фильм!']);
+  B.send({ type: 'conf_chat', confId, text: 'Уже!' });
+  assert.equal((await A.next('conf_chat')).message.userId, b.user.id);
+  const after = (await api(`/api/chats/${group}/messages`, a.token)).messages;
+  assert.ok(!after.some((m) => m.body === 'Включай фильм!' || m.body === 'Уже!'));
+  A.send({ type: 'conf_leave', confId });
+  B.send({ type: 'conf_leave', confId });
+  A.ws.close();
+  B.ws.close();
+});

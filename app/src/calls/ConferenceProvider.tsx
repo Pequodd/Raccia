@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { useMessenger } from '../store';
-import type { CallPeer, CallSignal, ConfEvent, ConfInfo, ConfPerson } from '../types';
+import type { CallPeer, CallSignal, ConfChatMessage, ConfEvent, ConfInfo, ConfPerson } from '../types';
 import { callsSupported, useCalls } from './CallProvider';
 import { tones } from './tones';
 
@@ -21,6 +21,7 @@ type ConfState = {
   sharing: boolean;
   screen: MediaStream | null; // our own screen, for the preview tile
   screenAudio: 'on' | 'off' | 'none'; // sound of the shared tab/screen (a film with friends)
+  chat: ConfChatMessage[]; // the conference's own chat
 };
 
 type Invite = ConfInfo & { host: CallPeer };
@@ -39,6 +40,7 @@ type Conferences = {
   toggleCamera: () => void;
   toggleScreen: () => void;
   toggleScreenAudio: () => void;
+  sendChat: (text: string) => void;
 };
 
 const ConfContext = createContext<Conferences | null>(null);
@@ -158,7 +160,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
           setInvite(null);
           const peers: Record<number, ConfPeer> = {};
           for (const p of event.peers) peers[p.id] = { ...p, stream: null };
-          setConf({ info: event.conf, startedAt: Date.now(), peers, local: localRef.current, muted: false, cameraOff: false, sharing: false, screen: null, screenAudio: 'none' });
+          setConf({ info: event.conf, startedAt: Date.now(), peers, local: localRef.current, muted: false, cameraOff: false, sharing: false, screen: null, screenAudio: 'none', chat: event.chat ?? [] });
           confRef.current = { info: event.conf } as ConfState;
           for (const p of event.peers) await callPeer(p.id);
           break;
@@ -205,6 +207,9 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
           }
           break;
         }
+        case 'conf_chat':
+          if (confRef.current?.info.id === event.confId) setConf((s) => (s ? { ...s, chat: [...s.chat, event.message].slice(-300) } : s));
+          break;
         case 'conf_screen':
           setPeer(event.userId, { screen: event.on });
           break;
@@ -352,11 +357,19 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     setConf((s) => (s ? { ...s, screenAudio: t.enabled ? 'on' : 'off' } : s));
   }, [fail]);
 
+  const sendChat = useCallback(
+    (text: string) => {
+      const id = confRef.current?.info.id;
+      if (id && text.trim()) sendSocket({ type: 'conf_chat', confId: id, text: text.trim() });
+    },
+    [sendSocket]
+  );
+
   useEffect(() => () => cleanup(), [me.id, cleanup]);
 
   return (
     <ConfContext.Provider
-      value={{ conf, invite, joining, error, canShareScreen, start, join, dismissInvite, leave, toggleMute, toggleCamera, toggleScreen, toggleScreenAudio }}
+      value={{ conf, invite, joining, error, canShareScreen, start, join, dismissInvite, leave, toggleMute, toggleCamera, toggleScreen, toggleScreenAudio, sendChat }}
     >
       {children}
     </ConfContext.Provider>

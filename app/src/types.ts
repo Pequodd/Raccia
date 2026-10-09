@@ -24,8 +24,11 @@ export const MEDIA_KINDS: readonly string[] = ['image', 'video', 'voice', 'circl
 export type ConfPerson = CallPeer & { screen: boolean };
 export type Conference = { id: string; active: boolean; video: boolean; startedAt: number; duration?: number; people: ConfPerson[] };
 export type ConfInfo = { id: string; chatId: number; video: boolean; title: string };
+// A line in the conference's own chat (lives only while the conference runs).
+export type ConfChatMessage = { id: number; userId: number; name: string; text: string; at: number };
 export type ConfEvent =
-  | { type: 'conf_joined'; conf: ConfInfo; peers: ConfPerson[] }
+  | { type: 'conf_joined'; conf: ConfInfo; peers: ConfPerson[]; chat: ConfChatMessage[] }
+  | { type: 'conf_chat'; confId: string; message: ConfChatMessage }
   | { type: 'conf_invite'; conf: ConfInfo & { host: CallPeer } }
   | { type: 'conf_peer_joined'; confId: string; peer: ConfPerson }
   | { type: 'conf_peer_left'; confId: string; userId: number }
