@@ -133,4 +133,4 @@ export function plural(n: number, one: string, few: string, many: string) {
 
 // The headline feature. Oleg runs on a Sber server, which is the joke.
 export const promise = 'БЕЗ ЦЕНЗУРЫ\nИ БЛОКИРОВОК РКН!';
-export const promiseProof = '✓ Сервер любезно предоставлен Сбером';
+export const promiseProof = '✓ Сервис расположен на серверах Сбера';
