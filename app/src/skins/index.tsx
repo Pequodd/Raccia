@@ -11,7 +11,7 @@ export type { Copy, Fill, Frame, Gradient, Skin } from './types';
 
 // Add a skin here and it appears in Settings.
 export const skins: Skin[] = [y2k, night, winamp, xp];
-export const defaultSkin = y2k;
+export const defaultSkin = xp; // who never picked a skin gets Олег XP
 
 const STORAGE_KEY = 'oleg.skin';
 
